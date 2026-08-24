@@ -121,3 +121,70 @@ export function addMonths(key: string, delta: number): string {
   const d = new Date(y, m - 1 + delta, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
+
+/** Rentang tanggal (inklusif) yang dipakai laporan. */
+export interface DateRange {
+  from: string;
+  to: string;
+}
+
+export type PeriodType = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
+
+/** Rentang satu minggu (Senin s.d. Minggu) yang memuat tanggal `iso`. */
+export function weekRangeOf(iso: string): DateRange {
+  const d = fromISODate(iso);
+  // getDay(): 0 = Minggu. Geser supaya Senin menjadi awal minggu.
+  const offsetToMonday = (d.getDay() + 6) % 7;
+  const start = new Date(d);
+  start.setDate(d.getDate() - offsetToMonday);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  return { from: toISODate(start), to: toISODate(end) };
+}
+
+export function monthRangeOf(key: string): DateRange {
+  const [y, m] = key.split('-').map(Number);
+  return { from: `${key}-01`, to: toISODate(new Date(y, m, 0)) };
+}
+
+export function yearRangeOf(year: string): DateRange {
+  return { from: `${year}-01-01`, to: `${year}-12-31` };
+}
+
+/** Daftar tanggal ISO di dalam sebuah rentang (dibatasi agar tidak membengkak). */
+export function datesInRange(range: DateRange, limit = 400): string[] {
+  const out: string[] = [];
+  const end = fromISODate(range.to);
+  const cursor = fromISODate(range.from);
+  while (cursor <= end && out.length < limit) {
+    out.push(toISODate(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return out;
+}
+
+/** Jumlah hari dalam rentang, minimal 1. */
+export function rangeLengthDays(range: DateRange): number {
+  return Math.max(1, daysBetween(range.from, range.to) + 1);
+}
+
+/** Label rentang yang enak dibaca manusia. */
+export function formatRange(range: DateRange): string {
+  if (range.from === range.to) return formatDateLong(range.from);
+  const a = fromISODate(range.from);
+  const b = fromISODate(range.to);
+  if (a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()) {
+    return `${a.getDate()}–${b.getDate()} ${MONTH_NAMES[b.getMonth()]} ${b.getFullYear()}`;
+  }
+  if (a.getFullYear() === b.getFullYear()) {
+    return `${a.getDate()} ${MONTH_SHORT[a.getMonth()]} – ${b.getDate()} ${MONTH_SHORT[b.getMonth()]} ${b.getFullYear()}`;
+  }
+  return `${formatDate(range.from)} – ${formatDate(range.to)}`;
+}
+
+/** Nama hari lengkap, dipakai pada laporan harian. */
+export const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+export function dayNameOf(iso: string): string {
+  return DAY_NAMES[fromISODate(iso).getDay()];
+}

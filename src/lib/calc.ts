@@ -229,3 +229,8 @@ export function monthStats(data: AppData, month: string): MonthStats {
     topCategory: breakdown[0],
   };
 }
+
+/** Transaksi di dalam rentang tanggal (inklusif di kedua ujung). */
+export function filterByRange(transactions: Transaction[], from: string, to: string): Transaction[] {
+  return transactions.filter((t) => t.date >= from && t.date <= to);
+}

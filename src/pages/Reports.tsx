@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { EmptyState, PageHeader } from '../components/Common';
 import { BarChart, DonutChart, ProgressBar } from '../components/Charts';
-import { IconArrowDown, IconArrowUp, IconChevronRight, IconTarget } from '../components/Icons';
+import ExportReportSheet from '../components/ExportReportSheet';
+import { IconArrowDown, IconArrowUp, IconChevronRight, IconDownload, IconTarget } from '../components/Icons';
 import {
   breakdownByCategory,
   budgetStatuses,
@@ -39,6 +40,7 @@ export default function Reports() {
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [focus, setFocus] = useState<TxType>('expense');
   const [grain, setGrain] = useState<Grain>('weekly');
+  const [exportOpen, setExportOpen] = useState(false);
 
   const cur = data.settings.currency;
   const dec = data.settings.showDecimals;
@@ -95,7 +97,15 @@ export default function Reports() {
 
   return (
     <div className="page-scroll">
-      <PageHeader title="Laporan" subtitle="Lihat ke mana uangmu pergi" />
+      <PageHeader
+        title="Laporan"
+        subtitle="Lihat ke mana uangmu pergi"
+        right={
+          <button className="icon-btn" onClick={() => setExportOpen(true)} aria-label="Unduh laporan PDF">
+            <IconDownload size={19} />
+          </button>
+        }
+      />
 
       <div className="page">
         <div className="segment plain mb-12">
@@ -156,6 +166,10 @@ export default function Reports() {
             </div>
           </div>
         </div>
+
+        <button className="btn secondary block mt-12" onClick={() => setExportOpen(true)}>
+          <IconDownload size={17} /> Unduh Laporan PDF
+        </button>
 
         {!hasData ? (
           <EmptyState
@@ -329,6 +343,8 @@ export default function Reports() {
           </div>
         )}
       </div>
+
+      <ExportReportSheet open={exportOpen} onClose={() => setExportOpen(false)} initialMonth={month} />
     </div>
   );
 }

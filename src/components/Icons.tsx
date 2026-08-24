@@ -146,3 +146,7 @@ export const IconTarget = (p: IconProps) => (
 export const IconAlert = (p: IconProps) => (
   <svg {...base({ size: 18, ...p })}><path d="M12 3.5 22 20H2L12 3.5Z" /><path d="M12 10v4.5M12 17.5h.01" /></svg>
 );
+
+export const IconFileText = (p: IconProps) => (
+  <svg {...base({ size: 18, ...p })}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" /><path d="M14 3v5h5" /><path d="M9 13h6M9 17h4" /></svg>
+);

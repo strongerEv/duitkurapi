@@ -33,7 +33,10 @@ export function prettyPhone(raw: string, countryCode = '62'): string {
   if (!n) return '-';
   const cc = (countryCode || '62').replace(/\D/g, '');
   const rest = n.startsWith(cc) ? n.slice(cc.length) : n;
-  const grouped = rest.replace(/(\d{3,4})(?=\d)/g, '$1-');
+  // Pola umum nomor seluler Indonesia: 3 digit operator, lalu kelompok 4 digit.
+  const head = rest.slice(0, 3);
+  const tail = rest.slice(3).match(/.{1,4}/g) ?? [];
+  const grouped = [head, ...tail].filter(Boolean).join('-');
   return `+${cc} ${grouped}`;
 }
 

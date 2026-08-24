@@ -86,6 +86,26 @@ Contoh hasil jadinya:
 > **Catatan privasi:** Duitku hanya *membuka* WhatsApp dengan pesan yang sudah jadi.
 > Kamu tetap yang menekan tombol kirim, jadi tidak ada pesan terkirim tanpa sepengetahuanmu.
 
+### 📄 Unduh Laporan PDF
+- **Periode fleksibel**: harian, mingguan (Senin–Minggu), bulanan, tahunan, atau **rentang tanggal bebas**
+- **Pilih isi laporannya sendiri** lewat 7 saklar: ringkasan, grafik arus kas, rincian kategori, daftar transaksi, posisi dompet, anggaran, dan hutang-piutang
+- **Pratinjau sebelum unduh** — jumlah transaksi, total masuk/keluar, dan rentang tanggalnya langsung terlihat
+- Isi berkas PDF-nya:
+  - Kop hijau berisi nama pemilik catatan, periode, dan tanggal pembuatan
+  - Kartu ringkasan pemasukan, pengeluaran, dan selisih
+  - Tabel statistik: jumlah transaksi, rata-rata harian, rasio tabungan, pengeluaran terbesar
+  - **Diagram batang** arus kas dan **diagram donat** per kategori — digambar sebagai vektor asli, tajam saat dicetak
+  - Tabel transaksi lengkap beserta total di bawahnya
+  - Posisi tiap dompet: saldo awal, mutasi periode, saldo terkini
+  - Bar pemakaian anggaran per kategori
+  - Daftar hutang-piutang aktif lengkap dengan nomor WA, sisa, umur hutang, dan **kotak sorot untuk yang lewat jatuh tempo**
+  - Nomor halaman otomatis di setiap lembar
+- Nama berkas rapi otomatis, contoh: `Duitku-Laporan-Bulanan-2026-08-01-sd-2026-08-31.pdf`
+- Pustaka PDF dimuat **hanya saat dipakai**, jadi aplikasi tetap ringan saat dibuka biasa
+
+Cocok untuk arsip pribadi, laporan ke pasangan, lampiran pengajuan pinjaman, atau sekadar dicetak.
+Bisa dibuka dari **Laporan → ikon unduh** atau **Pengaturan → Laporan PDF**.
+
 ### 📊 Laporan & Analisis
 - **Donut chart** rincian pengeluaran/pemasukan per kategori beserta persentasenya
 - **Bar chart** perbandingan masuk vs keluar, tampilan mingguan (7 hari) atau bulanan (12 bulan)
@@ -145,6 +165,7 @@ src/
 │
 ├── lib/
 │   ├── wa.ts                   ★ Normalisasi nomor WA, render template, buat link wa.me
+│   ├── pdf.ts                  ★ Penyusun laporan PDF (tata letak, tabel, grafik vektor)
 │   ├── calc.ts                 Perhitungan saldo, hutang, anggaran, statistik
 │   ├── date.ts                 Format tanggal Indonesia & "lama hutang" versi manusia
 │   ├── format.ts               Format mata uang & input nominal
@@ -157,6 +178,7 @@ src/
 │
 ├── components/
 │   ├── WhatsAppReminder.tsx    ★ Penyusun pesan penagihan + pratinjau gaya WA
+│   ├── ExportReportSheet.tsx   ★ Pemilih periode & isi laporan sebelum diunduh PDF
 │   ├── Charts.tsx              Donut, bar, progress bar, progress ring (SVG murni)
 │   ├── Common.tsx              Ikon kategori, avatar, baris transaksi, input nominal
 │   ├── Sheet.tsx               Bottom sheet & dialog konfirmasi
@@ -181,7 +203,8 @@ src/
 ```
 
 Tidak ada library chart, UI kit, atau state manager eksternal — hanya React, React Router,
-dan CSS. Ukuran bundle produksi sekitar **84 KB gzip**.
+dan CSS. Ukuran bundle utama sekitar **93 KB gzip**; jsPDF (~129 KB gzip) dimuat terpisah
+dan baru diunduh browser saat pengguna benar-benar membuat laporan PDF.
 
 ---
 
@@ -192,6 +215,7 @@ dan CSS. Ukuran bundle produksi sekitar **84 KB gzip**.
 - Saat mencatat piutang, aktifkan **"Catat ke arus kas"** agar uang yang dipinjamkan ikut mengurangi saldo.
 - Buat template penagihanmu sendiri di **Pengaturan → Template Penagihan** — pratinjaunya langsung terlihat.
 - **Unduh cadangan** secara berkala. Data hanya ada di browser ini; kalau riwayat browser dibersihkan, data ikut hilang.
+- Mau laporan ringkas saja? Di panel unduh PDF, tekan **"Ringkas saja"** untuk hanya menyertakan ringkasan dan daftar transaksi.
 
 ---
 

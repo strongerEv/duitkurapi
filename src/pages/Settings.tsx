@@ -4,9 +4,11 @@ import { useApp } from '../store/AppContext';
 import { useToast } from '../components/Toast';
 import { PageHeader, Switch } from '../components/Common';
 import Sheet, { ConfirmDialog } from '../components/Sheet';
+import ExportReportSheet from '../components/ExportReportSheet';
 import {
   IconChevronRight,
   IconDownload,
+  IconFileText,
   IconTrash,
   IconUpload,
   IconWhatsApp,
@@ -34,6 +36,7 @@ export default function Settings() {
   const [name, setName] = useState(data.settings.userName);
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmDemo, setConfirmDemo] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const s = data.settings;
 
@@ -145,6 +148,18 @@ export default function Settings() {
           </p>
         </div>
 
+        {/* Laporan PDF */}
+        <div className="section-head"><h2 className="section-title">Laporan PDF</h2></div>
+        <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <p className="fs-12 text-muted" style={{ lineHeight: 1.6 }}>
+            Buat laporan keuangan rapi dalam bentuk PDF — bisa harian, mingguan, bulanan, tahunan,
+            atau rentang tanggal bebas. Cocok untuk arsip pribadi, laporan ke pasangan, atau lampiran pengajuan.
+          </p>
+          <button className="btn block" onClick={() => setExportOpen(true)}>
+            <IconFileText size={17} /> Buat &amp; Unduh Laporan PDF
+          </button>
+        </section>
+
         {/* Cadangan */}
         <div className="section-head"><h2 className="section-title">Cadangan data</h2></div>
         <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -217,6 +232,8 @@ export default function Settings() {
           Simpan
         </button>
       </Sheet>
+
+      <ExportReportSheet open={exportOpen} onClose={() => setExportOpen(false)} />
 
       <ConfirmDialog
         open={confirmReset}
