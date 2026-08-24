@@ -1,0 +1,15 @@
+{
+  "name": "Duitku — Catatan Keuangan & Hutang",
+  "short_name": "Duitku",
+  "description": "Catat keuangan pribadi, atur budget, dan tagih hutang langsung lewat WhatsApp.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F2F7F4",
+  "theme_color": "#12996B",
+  "lang": "id",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
