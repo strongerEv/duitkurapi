@@ -4,47 +4,163 @@
  *  Jembatan sinkronisasi berbasis Google Apps Script.
  * ============================================================================
  *
+ *  TIDAK ADA YANG PERLU DIUBAH DI KODE INI.
+ *  Token dibuat otomatis oleh fungsi setupDatabase() dan disimpan aman
+ *  di Script Properties, bukan ditulis di dalam kode.
+ *
  *  CARA PEMASANGAN
  *  ---------------
- *  1. Buat Google Spreadsheet baru (boleh kosong, biarkan privat).
+ *  1. Buat Google Spreadsheet baru. Biarkan PRIVAT, jangan dibagikan ke
+ *     publik — isinya memuat nama dan nomor WhatsApp orang lain.
+ *
  *  2. Menu  Extensions -> Apps Script.
+ *
  *  3. Hapus isi file Code.gs bawaan, lalu tempel SELURUH isi berkas ini.
- *  4. Ganti nilai TOKEN di bawah dengan kata sandi rahasia buatan Anda.
- *     (Di aplikasi Duitku ada tombol untuk membuatkan token acak.)
- *  5. Simpan, lalu klik  Deploy -> New deployment.
- *       - Select type ......... Web app
- *       - Description ......... Duitku Sync
- *       - Execute as .......... Me (email Anda)
- *       - Who has access ...... Anyone           <-- WAJIB "Anyone",
- *                                                    bukan "Anyone with Google account"
- *  6. Klik Deploy, setujui izin yang diminta Google.
- *  7. Salin "Web app URL" yang berakhiran /exec
- *  8. Buka Duitku -> Pengaturan -> Hubungkan ke Spreadsheet,
- *     tempel URL dan token tadi, lalu tekan "Tes Koneksi".
+ *     Simpan (ikon disket atau Ctrl+S).
+ *
+ *  4. Di bagian atas editor ada kotak pilihan fungsi. Pilih  setupDatabase
+ *     lalu klik  Run.
+ *       - Google akan meminta izin. Klik Review permissions -> pilih akun Anda.
+ *       - Muncul peringatan "Google hasn't verified this app". Itu wajar,
+ *         karena script ini Anda tulis sendiri. Klik  Advanced  ->
+ *         "Go to <nama proyek> (unsafe)"  ->  Allow.
+ *       - Setelah selesai, TOKEN ANDA akan ditampilkan di kotak Execution log
+ *         di bagian bawah layar. Salin token itu.
+ *
+ *  5. Klik  Deploy -> New deployment -> pilih tipe  Web app.
+ *       - Execute as ........ Me (email Anda)
+ *       - Who has access .... Anyone      <-- WAJIB "Anyone",
+ *                                             bukan "Anyone with Google account"
+ *     Klik Deploy, lalu salin "Web app URL" yang berakhiran /exec
+ *
+ *  6. Buka Duitku -> Pengaturan -> Hubungkan ke Spreadsheet.
+ *     Tempel URL dan token tadi, lalu tekan "Tes Koneksi".
+ *
+ *  MELIHAT TOKEN LAGI DI KEMUDIAN HARI
+ *  -----------------------------------
+ *  Dari spreadsheet, gunakan menu  Duitku -> Lihat Token.
+ *  (Menu itu muncul setelah spreadsheet dimuat ulang sekali.)
+ *
+ *  MENGGANTI TOKEN
+ *  ---------------
+ *  Menu  Duitku -> Buat Token Baru. Token lama langsung tidak berlaku.
+ *  Anda TIDAK perlu deploy ulang — cukup perbarui token di aplikasi Duitku.
  *
  *  CATATAN KEAMANAN
  *  ----------------
- *  - Spreadsheet Anda TETAP PRIVAT. Yang bisa diakses publik hanyalah URL
- *    script ini, dan setiap permintaan wajib menyertakan TOKEN yang benar.
- *  - Perlakukan URL + token seperti kata sandi. Siapa pun yang memiliki
- *    keduanya bisa menulis ke spreadsheet Anda.
- *  - Kalau token bocor: ganti nilai TOKEN di bawah, lalu
- *    Deploy -> Manage deployments -> Edit -> Version: New version -> Deploy.
+ *  Spreadsheet Anda tetap privat. Yang bisa diakses dari luar hanyalah URL
+ *  script ini, dan setiap permintaan wajib menyertakan token yang benar.
+ *  Perlakukan URL + token seperti kata sandi.
  *
- *  SETIAP SINKRONISASI AKAN MENIMPA ISI SHEET YANG DIKELOLA DUITKU
+ *  Setiap sinkronisasi menimpa isi sheet yang dikelola Duitku
  *  (Ringkasan, Transaksi, Hutang, Dompet, Anggaran). Sheet lain buatan Anda
- *  sendiri tidak akan disentuh, jadi aman untuk menaruh pivot/grafik di sana.
+ *  sendiri tidak disentuh, jadi aman untuk menaruh pivot atau grafik di sana.
  * ============================================================================
  */
 
-/** Ganti dengan token rahasia Anda sendiri. Minimal 12 karakter. */
-var TOKEN = 'GANTI_DENGAN_TOKEN_RAHASIA_ANDA';
+/** Kunci penyimpanan token di Script Properties. */
+var TOKEN_KEY = 'DUITKU_TOKEN';
 
 /** Versi kontrak data yang didukung script ini. */
 var SUPPORTED_VERSION = 1;
 
+/** Sheet yang dikelola Duitku dan akan ditimpa setiap sinkronisasi. */
+var SHEET_NAMES = ['Ringkasan', 'Transaksi', 'Hutang', 'Dompet', 'Anggaran'];
+
 /* ========================================================================== */
-/*  Titik masuk                                                               */
+/*  Pemasangan                                                                */
+/* ========================================================================== */
+
+/**
+ * Jalankan sekali dari editor Apps Script (pilih fungsi ini lalu klik Run).
+ *
+ * Fungsi ini membuatkan token acak, menyiapkan sheet-sheet kosong, dan
+ * menampilkan token yang harus Anda tempel di aplikasi Duitku.
+ * Aman dijalankan berulang kali: token yang sudah ada tidak akan diganti.
+ */
+function setupDatabase() {
+  var props = PropertiesService.getScriptProperties();
+  var token = props.getProperty(TOKEN_KEY);
+  var tokenBaru = false;
+
+  if (!token) {
+    token = buatTokenAcak();
+    props.setProperty(TOKEN_KEY, token);
+    tokenBaru = true;
+  }
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var dibuat = siapkanSheetKosong(ss);
+
+  var pesan =
+    (tokenBaru ? 'Pemasangan selesai. Token baru sudah dibuat.' : 'Token yang sudah ada tetap dipakai.') +
+    '\n\n=======================================\n' +
+    ' TOKEN ANDA:\n\n' +
+    ' ' + token + '\n' +
+    '=======================================\n\n' +
+    'Salin token di atas, lalu tempel di aplikasi Duitku pada\n' +
+    'Pengaturan -> Hubungkan ke Spreadsheet.\n\n' +
+    'Spreadsheet : ' + ss.getName() + '\n' +
+    'Sheet siap  : ' + SHEET_NAMES.join(', ') +
+    (dibuat.length ? '\n Baru dibuat : ' + dibuat.join(', ') : '') +
+    '\n\nLangkah berikutnya:\n' +
+    'Deploy -> New deployment -> Web app\n' +
+    '  Execute as ...... Me\n' +
+    '  Who has access .. Anyone\n' +
+    'Lalu salin Web app URL yang berakhiran /exec.';
+
+  Logger.log(pesan);
+  tampilkanDialog('Duitku siap dipakai', pesan);
+  return token;
+}
+
+/** Menampilkan token yang tersimpan, lewat menu Duitku di spreadsheet. */
+function lihatToken() {
+  var token = tokenTersimpan();
+  if (!token) {
+    tampilkanDialog('Belum disiapkan', 'Token belum ada.\n\nJalankan dulu fungsi setupDatabase() dari editor Apps Script, atau pilih menu Duitku -> Siapkan Sheet.');
+    return;
+  }
+  tampilkanDialog(
+    'Token Duitku',
+    'Token Anda:\n\n' + token + '\n\nTempel token ini di aplikasi Duitku pada\nPengaturan -> Hubungkan ke Spreadsheet.',
+  );
+}
+
+/**
+ * Membuat token baru dan membatalkan yang lama.
+ * Tidak perlu deploy ulang, cukup perbarui token di aplikasi Duitku.
+ */
+function buatTokenBaru() {
+  var token = buatTokenAcak();
+  PropertiesService.getScriptProperties().setProperty(TOKEN_KEY, token);
+  var pesan =
+    'Token baru:\n\n' + token + '\n\n' +
+    'Token lama sudah tidak berlaku. Perbarui token di aplikasi Duitku\n' +
+    'supaya sinkronisasi bisa berjalan lagi.\n\n' +
+    'Anda tidak perlu melakukan deploy ulang.';
+  Logger.log(pesan);
+  tampilkanDialog('Token diperbarui', pesan);
+  return token;
+}
+
+/** Menambahkan menu "Duitku" di spreadsheet saat dibuka. */
+function onOpen() {
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu('Duitku')
+      .addItem('Siapkan Sheet', 'setupDatabase')
+      .addItem('Lihat Token', 'lihatToken')
+      .addSeparator()
+      .addItem('Buat Token Baru', 'buatTokenBaru')
+      .addToUi();
+  } catch (err) {
+    // Spreadsheet dibuka tanpa antarmuka (misalnya lewat pemicu terjadwal).
+  }
+}
+
+/* ========================================================================== */
+/*  Titik masuk web app                                                       */
 /* ========================================================================== */
 
 /**
@@ -59,14 +175,16 @@ function doGet(e) {
       ok: true,
       app: 'duitku-sheets-bridge',
       version: SUPPORTED_VERSION,
-      message: 'Jembatan Duitku aktif. Sambungkan dari aplikasi Duitku.',
+      siap: Boolean(tokenTersimpan()),
+      message: tokenTersimpan()
+        ? 'Jembatan Duitku aktif. Sambungkan dari aplikasi Duitku.'
+        : 'Script terpasang, tetapi setupDatabase() belum dijalankan.',
     });
   }
 
   if (params.action === 'ping') {
-    if (!isTokenValid(params.token)) {
-      return jsonOut({ ok: false, error: 'TOKEN_SALAH', message: 'Token tidak cocok.' });
-    }
+    var cek = periksaToken(params.token);
+    if (!cek.ok) return jsonOut(cek);
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     return jsonOut({
       ok: true,
@@ -97,9 +215,8 @@ function doPost(e) {
     return jsonOut({ ok: false, error: 'JSON_RUSAK', message: 'Isi kiriman bukan JSON yang sah.' });
   }
 
-  if (!isTokenValid(payload.token)) {
-    return jsonOut({ ok: false, error: 'TOKEN_SALAH', message: 'Token tidak cocok.' });
-  }
+  var cek = periksaToken(payload.token);
+  if (!cek.ok) return jsonOut(cek);
 
   if (payload.action === 'ping') {
     return jsonOut({ ok: true, action: 'ping', message: 'Koneksi berhasil.' });
@@ -113,7 +230,7 @@ function doPost(e) {
     return jsonOut({
       ok: false,
       error: 'VERSI_TIDAK_COCOK',
-      message: 'Versi aplikasi lebih baru dari script. Perbarui Code.gs di Apps Script.',
+      message: 'Versi aplikasi lebih baru dari script. Tempel ulang Code.gs versi terbaru, lalu deploy ulang.',
     });
   }
 
@@ -135,8 +252,6 @@ function doPost(e) {
       written.push({ name: spec.name, rows: (spec.rows || []).length });
     }
 
-    // Sheet bawaan "Sheet1"/"Sheet 1" yang masih kosong ikut dibersihkan
-    // supaya spreadsheet terlihat rapi setelah sinkronisasi pertama.
     removeEmptyDefaultSheet(ss);
 
     return jsonOut({
@@ -277,7 +392,21 @@ function formatFor(type, payload) {
   }
 }
 
-/** Membuang sheet bawaan kosong setelah sinkronisasi pertama. */
+/** Membuat sheet kosong beserta catatan penanda, dipakai saat pemasangan. */
+function siapkanSheetKosong(ss) {
+  var dibuat = [];
+  for (var i = 0; i < SHEET_NAMES.length; i++) {
+    var name = SHEET_NAMES[i];
+    if (ss.getSheetByName(name)) continue;
+    var sheet = ss.insertSheet(name);
+    sheet.getRange(1, 1).setValue('Menunggu sinkronisasi pertama dari aplikasi Duitku.');
+    dibuat.push(name);
+  }
+  removeEmptyDefaultSheet(ss);
+  return dibuat;
+}
+
+/** Membuang sheet bawaan kosong setelah pemasangan atau sinkronisasi pertama. */
 function removeEmptyDefaultSheet(ss) {
   var all = ss.getSheets();
   if (all.length <= 1) return;
@@ -293,18 +422,47 @@ function removeEmptyDefaultSheet(ss) {
 }
 
 /* ========================================================================== */
-/*  Pembantu                                                                  */
+/*  Token                                                                     */
 /* ========================================================================== */
 
+/** Token acak berbasis UUID, cukup panjang untuk dipakai sebagai kata sandi. */
+function buatTokenAcak() {
+  return Utilities.getUuid().replace(/-/g, '');
+}
+
+function tokenTersimpan() {
+  return PropertiesService.getScriptProperties().getProperty(TOKEN_KEY) || '';
+}
+
 /**
- * Membandingkan token dengan waktu tetap, supaya tidak bisa ditebak
- * karakter demi karakter dari selisih waktu balasan.
+ * Memeriksa token kiriman dan menjelaskan penyebabnya bila gagal, supaya
+ * aplikasi bisa menampilkan langkah perbaikan yang tepat.
  */
-function isTokenValid(candidate) {
-  var expected = String(TOKEN || '');
-  var given = String(candidate || '');
-  if (expected === 'GANTI_DENGAN_TOKEN_RAHASIA_ANDA') return false;
-  if (expected.length === 0 || given.length !== expected.length) return false;
+function periksaToken(candidate) {
+  var expected = tokenTersimpan();
+  if (!expected) {
+    return {
+      ok: false,
+      error: 'BELUM_DISIAPKAN',
+      message: 'Script belum disiapkan. Buka editor Apps Script, pilih fungsi setupDatabase, lalu klik Run untuk mendapatkan token.',
+    };
+  }
+  if (!cocokAman(expected, String(candidate || ''))) {
+    return {
+      ok: false,
+      error: 'TOKEN_SALAH',
+      message: 'Token tidak cocok. Ambil token yang benar lewat menu Duitku -> Lihat Token pada spreadsheet Anda.',
+    };
+  }
+  return { ok: true };
+}
+
+/**
+ * Membandingkan dua teks dengan waktu tetap, supaya token tidak bisa
+ * ditebak karakter demi karakter dari selisih waktu balasan.
+ */
+function cocokAman(expected, given) {
+  if (expected.length !== given.length) return false;
   var diff = 0;
   for (var i = 0; i < expected.length; i++) {
     diff |= expected.charCodeAt(i) ^ given.charCodeAt(i);
@@ -312,21 +470,19 @@ function isTokenValid(candidate) {
   return diff === 0;
 }
 
+/* ========================================================================== */
+/*  Pembantu                                                                  */
+/* ========================================================================== */
+
 function jsonOut(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
-/**
- * Bisa dijalankan manual dari editor Apps Script (tombol Run) untuk
- * memastikan script punya izin dan token sudah diganti.
- */
-function ujiPemasangan() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!isTokenValid(TOKEN)) {
-    Logger.log('GAGAL: TOKEN belum diganti atau kosong. Ubah nilai variabel TOKEN di baris atas.');
-    return;
+/** Menampilkan kotak dialog bila tersedia; kalau tidak, cukup lewat Logger. */
+function tampilkanDialog(judul, pesan) {
+  try {
+    SpreadsheetApp.getUi().alert(judul, pesan, SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (err) {
+    // Dijalankan tanpa antarmuka. Isinya tetap tercatat di Execution log.
   }
-  Logger.log('OK. Spreadsheet: ' + ss.getName());
-  Logger.log('Token sudah diisi (' + String(TOKEN).length + ' karakter).');
-  Logger.log('Langkah berikutnya: Deploy -> New deployment -> Web app -> Who has access: Anyone.');
 }

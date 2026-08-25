@@ -340,14 +340,6 @@ export async function syncToSheets(url: string, token: string, data: AppData): P
   }
 }
 
-/** Membuat token acak yang cukup panjang untuk dipakai sebagai kata sandi. */
-export function generateToken(): string {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
-}
-
 /** Perkiraan jumlah baris yang akan ditulis, untuk ditampilkan sebelum kirim. */
 export function countRows(data: AppData): number {
   return buildSheets(data).reduce((sum, s) => sum + s.rows.length, 0);

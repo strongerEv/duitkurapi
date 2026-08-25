@@ -108,14 +108,20 @@ ditulis sebagai tanggal asli — jadi langsung bisa dibuat pivot atau grafik. Sh
 tidak pernah disentuh.
 
 **Cara memasang** — panduan lengkapnya ada di dalam aplikasi (Pengaturan → Hubungkan ke Spreadsheet),
-lengkap dengan tombol salin kode dan pembuat token acak:
+lengkap dengan tombol salin kode. **Tidak ada satu baris pun di `Code.gs` yang perlu diubah:**
 
 1. Buat spreadsheet baru, biarkan privat
 2. Extensions → Apps Script, tempel isi [`google-apps-script/Code.gs`](google-apps-script/Code.gs)
-3. Ganti nilai `TOKEN` dengan token dari aplikasi
-4. Deploy → New deployment → **Web app**, dengan **Who has access: Anyone**
-5. Salin Web app URL yang berakhiran `/exec`, tempel di aplikasi bersama tokennya
-6. Tekan **Tes Koneksi**, lalu **Kirim ke Spreadsheet**
+3. Pilih fungsi **`setupDatabase`** di kotak pilihan atas editor → **Run** → izinkan akses
+4. Token muncul di dialog dan di Execution log — salin
+5. Deploy → New deployment → **Web app**, dengan **Who has access: Anyone**
+   (di sini tidak ada pilihan fungsi; Apps Script memakai `doGet`/`doPost` otomatis)
+6. Tempel URL `/exec` dan token di aplikasi, tekan **Tes Koneksi** lalu **Kirim ke Spreadsheet**
+
+Token dibuat acak oleh script dan disimpan di **Script Properties**, bukan di dalam kode. Setelah
+spreadsheet dimuat ulang sekali, tersedia menu **Duitku** di spreadsheet berisi *Siapkan Sheet*,
+*Lihat Token*, dan *Buat Token Baru*. Mengganti token **tidak memerlukan deploy ulang** — cukup
+perbarui nilainya di aplikasi.
 
 > **Catatan teknis:** Duitku mengirim JSON dengan `Content-Type: text/plain`. Ini disengaja —
 > dengan begitu browser memperlakukannya sebagai *simple request* dan tidak mengirim preflight

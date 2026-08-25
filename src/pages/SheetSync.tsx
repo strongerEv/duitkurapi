@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { useToast } from '../components/Toast';
 import { PageHeader } from '../components/Common';
-import { IconCheck, IconCopy, IconDownload, IconEdit, IconUpload } from '../components/Icons';
+import { IconCheck, IconCopy, IconDownload, IconUpload } from '../components/Icons';
 import {
   countRows,
-  generateToken,
   isValidScriptUrl,
   syncToSheets,
   testConnection,
@@ -28,19 +27,23 @@ const STEPS = [
   },
   {
     title: 'Tempel kode Duitku',
-    body: 'Hapus seluruh isi file Code.gs bawaan, lalu tempel kode yang kamu salin dari tombol di bawah.',
+    body: 'Hapus seluruh isi Code.gs bawaan, tempel kode dari tombol di bawah, lalu simpan. Tidak ada satu pun baris yang perlu kamu ubah.',
   },
   {
-    title: 'Pasang token rahasia',
-    body: 'Di baris atas kode, ganti GANTI_DENGAN_TOKEN_RAHASIA_ANDA dengan token yang kamu buat di halaman ini. Token di kode dan di aplikasi harus persis sama.',
+    title: 'Jalankan setupDatabase',
+    body: 'Di kotak pilihan fungsi bagian atas editor, pilih setupDatabase lalu klik Run. Google akan minta izin — pilih akunmu, klik Advanced, lalu "Go to … (unsafe)" dan Allow. Peringatan itu wajar karena script ini kamu tulis sendiri.',
+  },
+  {
+    title: 'Salin token yang muncul',
+    body: 'Setelah Run selesai, token tampil di kotak dialog dan di Execution log bagian bawah. Salin token itu — nanti ditempel di halaman ini. Lupa? Buka spreadsheet, pilih menu Duitku → Lihat Token.',
   },
   {
     title: 'Deploy sebagai Web app',
-    body: 'Klik Deploy → New deployment → pilih tipe Web app. Setel "Execute as: Me" dan "Who has access: Anyone" (bukan Anyone with Google account), lalu Deploy dan setujui izinnya.',
+    body: 'Klik Deploy → New deployment → pilih tipe Web app. Setel "Execute as: Me" dan "Who has access: Anyone" (bukan Anyone with Google account), lalu Deploy. Di sini tidak ada pilihan fungsi — Apps Script memakai doGet dan doPost otomatis.',
   },
   {
-    title: 'Salin URL dan tempel di sini',
-    body: 'Salin Web app URL yang berakhiran /exec, tempel di kolom di bawah bersama tokenmu, lalu tekan Tes Koneksi.',
+    title: 'Tempel URL dan token di sini',
+    body: 'Salin Web app URL yang berakhiran /exec, tempel di kolom di bawah bersama token tadi, lalu tekan Tes Koneksi.',
   },
 ];
 
@@ -72,14 +75,6 @@ export default function SheetSync() {
     } catch {
       toast('Browser menolak akses clipboard', 'error');
     }
-  };
-
-  const buatToken = () => {
-    const baru = generateToken();
-    setToken(baru);
-    setShowToken(true);
-    simpanKredensial({ token: baru });
-    toast('Token baru dibuat — jangan lupa tempel juga ke Code.gs', 'success');
   };
 
   const tesKoneksi = async () => {
@@ -279,17 +274,11 @@ export default function SheetSync() {
                 {showToken ? 'Tutup' : 'Lihat'}
               </button>
             </div>
-            <div className="btn-row mt-8">
-              <button className="btn xs secondary" onClick={buatToken}>
-                <IconEdit size={14} /> Buatkan Token
-              </button>
-              <button className="btn xs secondary" disabled={!token} onClick={() => void salin(token, 'Token')}>
-                <IconCopy size={14} /> Salin Token
-              </button>
-            </div>
             <p className="field-hint">
-              Token ini harus persis sama dengan nilai <code>TOKEN</code> di baris atas Code.gs. Setelah mengubah
-              token di Apps Script, jangan lupa deploy ulang dengan versi baru.
+              Token dibuat otomatis oleh script saat kamu menjalankan <code>setupDatabase</code>, jadi tidak perlu
+              mengarang sendiri. Lupa tokennya? Buka spreadsheetmu lalu pilih menu <strong>Duitku → Lihat Token</strong>.
+              Kalau token diganti dari menu <strong>Duitku → Buat Token Baru</strong>, cukup perbarui di sini —
+              tidak perlu deploy ulang.
             </p>
           </div>
         </section>
