@@ -44,12 +44,17 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultCountryCode: '62',
   reminderTemplates: DEFAULT_TEMPLATES,
   theme: 'light',
+  sheetSync: { url: '', token: '' },
 };
 
 export function createEmptyData(): AppData {
   return {
     version: DATA_VERSION,
-    settings: { ...DEFAULT_SETTINGS, reminderTemplates: DEFAULT_TEMPLATES.map((t) => ({ ...t })) },
+    settings: {
+      ...DEFAULT_SETTINGS,
+      reminderTemplates: DEFAULT_TEMPLATES.map((t) => ({ ...t })),
+      sheetSync: { ...DEFAULT_SETTINGS.sheetSync },
+    },
     wallets: DEFAULT_WALLETS.map((w) => ({ ...w })),
     categories: DEFAULT_CATEGORIES.map((c) => ({ ...c })),
     transactions: [],

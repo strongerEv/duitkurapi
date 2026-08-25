@@ -86,6 +86,41 @@ Contoh hasil jadinya:
 > **Catatan privasi:** Duitku hanya *membuka* WhatsApp dengan pesan yang sudah jadi.
 > Kamu tetap yang menekan tombol kirim, jadi tidak ada pesan terkirim tanpa sepengetahuanmu.
 
+### 📊 Sinkronisasi ke Google Sheets
+Duitku bisa mengirim seluruh datanya ke spreadsheet milikmu sendiri, otomatis, tanpa server perantara.
+
+**Spreadsheet tetap privat.** Yang diakses dari luar hanya sebuah Apps Script kecil yang kamu pasang
+sendiri di spreadsheet itu, dan setiap kiriman wajib membawa token rahasiamu. Ini penting, karena data
+Duitku memuat nama dan nomor WhatsApp orang lain — jangan pernah membuat spreadsheetnya publik.
+
+Lima sheet yang ditulis (ditimpa setiap sinkronisasi):
+
+| Sheet | Isi |
+|---|---|
+| **Ringkasan** | Saldo, total masuk/keluar, posisi hutang-piutang, jumlah catatan |
+| **Transaksi** | Tanggal, jenis, kategori, dompet, catatan, pemasukan, pengeluaran, kode bulan |
+| **Hutang** | Nama, nomor WA, pokok, terbayar, sisa, tanggal, jatuh tempo, umur, status, riwayat penagihan |
+| **Dompet** | Saldo awal, total masuk/keluar, saldo terkini |
+| **Anggaran** | Batas, terpakai, sisa, persentase bulan berjalan |
+
+Judul kolom dibekukan, filter dipasang otomatis, kolom nominal diberi format mata uang, dan tanggal
+ditulis sebagai tanggal asli — jadi langsung bisa dibuat pivot atau grafik. Sheet lain buatanmu sendiri
+tidak pernah disentuh.
+
+**Cara memasang** — panduan lengkapnya ada di dalam aplikasi (Pengaturan → Hubungkan ke Spreadsheet),
+lengkap dengan tombol salin kode dan pembuat token acak:
+
+1. Buat spreadsheet baru, biarkan privat
+2. Extensions → Apps Script, tempel isi [`google-apps-script/Code.gs`](google-apps-script/Code.gs)
+3. Ganti nilai `TOKEN` dengan token dari aplikasi
+4. Deploy → New deployment → **Web app**, dengan **Who has access: Anyone**
+5. Salin Web app URL yang berakhiran `/exec`, tempel di aplikasi bersama tokennya
+6. Tekan **Tes Koneksi**, lalu **Kirim ke Spreadsheet**
+
+> **Catatan teknis:** Duitku mengirim JSON dengan `Content-Type: text/plain`. Ini disengaja —
+> dengan begitu browser memperlakukannya sebagai *simple request* dan tidak mengirim preflight
+> `OPTIONS`, yang tidak bisa dijawab oleh Apps Script. Memakai `application/json` akan selalu gagal CORS.
+
 ### 📄 Unduh Laporan PDF
 - **Periode fleksibel**: harian, mingguan (Senin–Minggu), bulanan, tahunan, atau **rentang tanggal bebas**
 - **Pilih isi laporannya sendiri** lewat 7 saklar: ringkasan, grafik arus kas, rincian kategori, daftar transaksi, posisi dompet, anggaran, dan hutang-piutang
@@ -166,6 +201,7 @@ src/
 ├── lib/
 │   ├── wa.ts                   ★ Normalisasi nomor WA, render template, buat link wa.me
 │   ├── pdf.ts                  ★ Penyusun laporan PDF (tata letak, tabel, grafik vektor)
+│   ├── sheets.ts               ★ Penyusun & pengirim data ke Google Sheets
 │   ├── calc.ts                 Perhitungan saldo, hutang, anggaran, statistik
 │   ├── date.ts                 Format tanggal Indonesia & "lama hutang" versi manusia
 │   ├── format.ts               Format mata uang & input nominal

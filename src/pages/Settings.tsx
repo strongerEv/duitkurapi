@@ -148,6 +148,21 @@ export default function Settings() {
           </p>
         </div>
 
+        {/* Spreadsheet */}
+        <div className="section-head"><h2 className="section-title">Google Sheets</h2></div>
+        <section className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <MenuRow
+            emoji="📊"
+            title="Hubungkan ke Spreadsheet"
+            desc={
+              s.sheetSync.lastSyncAt
+                ? `Tersambung${s.sheetSync.spreadsheetName ? ` · ${s.sheetSync.spreadsheetName}` : ''}`
+                : 'Kirim data otomatis ke Google Sheets milikmu'
+            }
+            onClick={() => navigate('/pengaturan/spreadsheet')}
+          />
+        </section>
+
         {/* Laporan PDF */}
         <div className="section-head"><h2 className="section-title">Laporan PDF</h2></div>
         <section className="card" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

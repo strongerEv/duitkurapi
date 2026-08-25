@@ -114,6 +114,24 @@ export interface Settings {
   /** Template pesan penagihan. Mendukung placeholder, lihat `lib/wa.ts`. */
   reminderTemplates: MessageTemplate[];
   theme: 'light' | 'dark';
+  /** Sinkronisasi ke Google Sheets lewat Apps Script. */
+  sheetSync: SheetSyncSettings;
+}
+
+/** Pengaturan jembatan Duitku -> Google Sheets. */
+export interface SheetSyncSettings {
+  /** URL Web app Apps Script, berakhiran `/exec`. */
+  url: string;
+  /** Token rahasia yang harus sama dengan nilai TOKEN di Code.gs. */
+  token: string;
+  /** Waktu sinkronisasi terakhir yang berhasil. */
+  lastSyncAt?: number;
+  /** Jumlah baris yang terkirim pada sinkronisasi terakhir. */
+  lastRowCount?: number;
+  /** Nama spreadsheet tujuan, dibaca dari balasan script. */
+  spreadsheetName?: string;
+  /** Tautan langsung ke spreadsheet tujuan. */
+  spreadsheetUrl?: string;
 }
 
 export interface MessageTemplate {

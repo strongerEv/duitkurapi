@@ -12,6 +12,7 @@ import Settings from './pages/Settings';
 import Categories from './pages/Categories';
 import Wallets from './pages/Wallets';
 import Templates from './pages/Templates';
+import SheetSync from './pages/SheetSync';
 import Onboarding from './pages/Onboarding';
 import { useApp } from './store/AppContext';
 
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/pengaturan/kategori" element={<Categories />} />
         <Route path="/pengaturan/dompet" element={<Wallets />} />
         <Route path="/pengaturan/template" element={<Templates />} />
+        <Route path="/pengaturan/spreadsheet" element={<SheetSync />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {!fullScreen && <BottomNav />}

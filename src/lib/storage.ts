@@ -43,6 +43,8 @@ export function migrate(input: Partial<AppData>): AppData {
   if (!Array.isArray(settings.reminderTemplates) || settings.reminderTemplates.length === 0) {
     settings.reminderTemplates = base.settings.reminderTemplates;
   }
+  // Data lama belum mengenal sinkronisasi spreadsheet.
+  settings.sheetSync = { ...base.settings.sheetSync, ...(input.settings?.sheetSync ?? {}) };
   return {
     version: DATA_VERSION,
     settings,
