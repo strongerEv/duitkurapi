@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kebijakan Privasi — Duitku</title>
+<meta name="description" content="Kebijakan privasi aplikasi Duitku: seluruh data keuangan disimpan di perangkat pengguna, tanpa server dan tanpa pelacakan." />
+<style>
+  :root {
+    --green:#12996B; --green-dark:#0B6746; --green-50:#EAF9F2;
+    --bg:#F2F7F4; --surface:#fff; --text:#0E2A20; --muted:#5B7A6C; --border:#E2EDE7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0A1712; --surface:#12261E; --text:#E8F5EE; --muted:#9BBBAB; --border:#1E3C2F; --green-50:#0F2B20; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);line-height:1.65;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:16px}
+  header{background:linear-gradient(135deg,#1FD08A,var(--green) 45%,var(--green-dark));color:#fff;padding:40px 20px 32px}
+  .wrap{max-width:760px;margin:0 auto;padding:0 20px}
+  header .wrap{padding:0 20px}
+  h1{margin:0 0 6px;font-size:28px;letter-spacing:-.02em}
+  header p{margin:0;opacity:.92;font-size:15px}
+  main{padding:32px 0 60px}
+  h2{font-size:19px;margin:34px 0 10px;letter-spacing:-.01em}
+  h2:first-child{margin-top:0}
+  p,li{color:var(--muted)}
+  strong{color:var(--text)}
+  ul{padding-left:20px}
+  li{margin:6px 0}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px 20px;margin:18px 0}
+  .highlight{background:var(--green-50);border-color:transparent}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+  th,td{text-align:left;padding:10px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{color:var(--green-dark);font-size:13px;text-transform:uppercase;letter-spacing:.04em}
+  @media (prefers-color-scheme: dark){ th{color:#35C98A} }
+  code{background:var(--green-50);padding:2px 6px;border-radius:6px;font-size:14px}
+  footer{border-top:1px solid var(--border);margin-top:40px;padding-top:20px;font-size:14px;color:var(--muted)}
+  a{color:var(--green)}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Kebijakan Privasi Duitku</h1>
+    <p>Berlaku sejak 27 Agustus 2026 &middot; Versi 1.0</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="card highlight">
+    <p style="margin:0"><strong>Ringkasnya:</strong> Duitku tidak punya server. Seluruh catatan keuanganmu
+    disimpan di perangkatmu sendiri. Kami tidak mengumpulkan, mengirim, menjual, atau melihat datamu —
+    karena secara teknis memang tidak ada jalurnya.</p>
+  </div>
+
+  <h2>1. Siapa kami</h2>
+  <p>Duitku adalah aplikasi pencatat keuangan pribadi dan pengelola hutang. Aplikasi ini tersedia sebagai
+  aplikasi web dan aplikasi Android. Kebijakan ini menjelaskan bagaimana data diperlakukan pada keduanya.</p>
+
+  <h2>2. Data yang kamu simpan di Duitku</h2>
+  <p>Kamu dapat mencatat informasi berikut. Seluruhnya kamu masukkan sendiri, dan seluruhnya tersimpan
+  hanya di perangkatmu:</p>
+  <ul>
+    <li>Transaksi keuangan: nominal, kategori, dompet, tanggal, dan catatan</li>
+    <li>Saldo dan nama dompet atau rekening</li>
+    <li>Catatan hutang dan piutang: <strong>nama serta nomor WhatsApp</strong> pihak terkait, nominal,
+        tanggal, jatuh tempo, dan riwayat pembayaran</li>
+    <li>Anggaran bulanan</li>
+    <li>Nama panggilanmu dan preferensi tampilan</li>
+  </ul>
+
+  <h2>3. Di mana data disimpan</h2>
+  <table>
+    <tr><th>Platform</th><th>Lokasi penyimpanan</th></tr>
+    <tr><td>Aplikasi web</td><td><code>localStorage</code> pada browser di perangkatmu</td></tr>
+    <tr><td>Aplikasi Android</td><td>Penyimpanan aplikasi di perangkat, beserta salinan pada
+      Android Preferences yang ikut serta dalam Android Auto Backup milik Google bila fitur itu kamu aktifkan</td></tr>
+  </table>
+  <p>Tidak ada satu pun data yang dikirim ke server milik pengembang. Duitku tidak memiliki server,
+  tidak memiliki basis data, dan tidak memerlukan akun atau pendaftaran.</p>
+
+  <h2>4. Data tidak dikumpulkan dan tidak dilacak</h2>
+  <p>Duitku <strong>tidak</strong> memuat alat analitik, pelacak, piksel iklan, maupun layanan pihak ketiga
+  yang memantau pemakaian. Kami tidak mengetahui siapa yang memakai aplikasi ini, berapa banyak, ataupun
+  apa isi catatannya. Tidak ada data yang dijual atau dibagikan kepada pihak mana pun.</p>
+
+  <h2>5. Kapan data meninggalkan perangkatmu</h2>
+  <p>Hanya bila kamu sendiri yang memintanya, melalui tiga fitur berikut:</p>
+
+  <div class="card">
+    <p><strong>a. Penagihan lewat WhatsApp.</strong> Saat kamu menekan tombol tagih, Duitku membuka
+    WhatsApp dengan pesan yang sudah tersusun. Pesan tersebut berisi nominal dan lama hutang.
+    <strong>Duitku tidak mengirim pesan itu</strong> — kamu yang menekan tombol kirim di WhatsApp.
+    Selanjutnya pesan tunduk pada kebijakan privasi WhatsApp.</p>
+
+    <p><strong>b. Sinkronisasi Google Spreadsheet.</strong> Bila kamu mengaktifkannya, datamu dikirim ke
+    spreadsheet Google <strong>milikmu sendiri</strong>, melalui Apps Script yang kamu pasang dan kamu
+    kendalikan. Pengembang Duitku tidak memiliki akses ke spreadsheet tersebut. Data di sana tunduk pada
+    kebijakan privasi Google.</p>
+
+    <p style="margin-bottom:0"><strong>c. Ekspor berkas.</strong> Laporan PDF dan berkas cadangan JSON
+    disimpan ke perangkatmu. Ke mana berkas itu selanjutnya kamu kirim sepenuhnya keputusanmu.</p>
+  </div>
+
+  <h2>6. Data orang lain yang kamu catat</h2>
+  <p>Fitur hutang memungkinkanmu menyimpan nama dan nomor WhatsApp orang lain. Perlu diperhatikan:</p>
+  <ul>
+    <li>Data itu kamu masukkan secara manual. Duitku <strong>tidak membaca daftar kontak</strong> di perangkatmu.</li>
+    <li>Data tetap berada di perangkatmu, kecuali kamu mengaktifkan sinkronisasi spreadsheet.</li>
+    <li>Sebagai pihak yang mencatat, <strong>kamu bertanggung jawab</strong> atas data pribadi orang lain
+        tersebut — termasuk menjaganya tetap aman dan tidak menyebarkannya tanpa izin.</li>
+    <li>Bila kamu memakai sinkronisasi spreadsheet, <strong>jangan membuat spreadsheet itu publik.</strong></li>
+  </ul>
+
+  <h2>7. Izin yang diminta aplikasi Android</h2>
+  <table>
+    <tr><th>Izin</th><th>Kegunaan</th></tr>
+    <tr><td>Internet</td><td>Hanya dipakai bila kamu mengaktifkan sinkronisasi spreadsheet, atau saat
+      membuka WhatsApp. Tanpa fitur itu, aplikasi berjalan sepenuhnya luring.</td></tr>
+  </table>
+  <p>Duitku tidak meminta izin kontak, lokasi, kamera, mikrofon, maupun penyimpanan bersama.</p>
+
+  <h2>8. Menghapus datamu</h2>
+  <p>Karena data hanya ada di perangkatmu, kamu sepenuhnya yang mengendalikannya:</p>
+  <ul>
+    <li>Buka <strong>Pengaturan &rarr; Hapus Semua Data</strong> di dalam aplikasi, atau</li>
+    <li>Hapus aplikasi, atau bersihkan data situs pada browser</li>
+  </ul>
+  <p>Setelah itu data hilang permanen dan tidak dapat kami pulihkan, karena kami memang tidak pernah
+  memilikinya. Unduh cadangan lebih dulu bila datanya masih kamu perlukan.</p>
+
+  <h2>9. Keamanan</h2>
+  <p>Data tersimpan di dalam ruang aplikasi pada perangkatmu, terlindung oleh sistem operasi. Karena tidak
+  ada pengiriman ke server, tidak ada pula risiko kebocoran dari sisi kami. Yang perlu kamu jaga adalah
+  keamanan perangkatmu sendiri, serta URL dan token sinkronisasi spreadsheet bila fitur itu kamu pakai —
+  perlakukan keduanya seperti kata sandi.</p>
+
+  <h2>10. Anak-anak</h2>
+  <p>Duitku bukan aplikasi yang ditujukan untuk anak di bawah 13 tahun, dan kami tidak mengumpulkan data
+  dari siapa pun, termasuk anak-anak.</p>
+
+  <h2>11. Perubahan kebijakan</h2>
+  <p>Bila kebijakan ini diperbarui, tanggal berlakunya di bagian atas halaman ikut diperbarui. Perubahan
+  yang berdampak besar akan diumumkan di dalam aplikasi.</p>
+
+  <h2>12. Kontak</h2>
+  <p>Pertanyaan mengenai kebijakan ini dapat dikirim ke:
+  <strong>[ISI ALAMAT EMAIL KONTAK ANDA DI SINI]</strong></p>
+
+  <footer>
+    <p>Duitku &middot; Aplikasi pencatat keuangan pribadi &amp; pengelola hutang<br />
+    Kebijakan privasi versi 1.0, 27 Agustus 2026.</p>
+  </footer>
+</main>
+</body>
+</html>

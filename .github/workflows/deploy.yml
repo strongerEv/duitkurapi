@@ -1,0 +1,58 @@
+# Membangun Duitku dan menerbitkannya ke GitHub Pages.
+#
+# Sekali diaktifkan, setiap dorongan ke branch utama akan memperbarui
+# aplikasi web sekaligus halaman kebijakan privasi yang dipakai Play Store.
+#
+# Cara mengaktifkan (sekali saja):
+#   Settings -> Pages -> Source: GitHub Actions
+name: Deploy ke GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  # Bisa juga dijalankan manual dari tab Actions.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Bila ada dua penerbitan berbarengan, yang terbaru menang tanpa membatalkan
+# penerbitan yang sedang berjalan.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Pasang dependensi
+        run: npm ci
+
+      - name: Periksa tipe dan bangun
+        run: npm run build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

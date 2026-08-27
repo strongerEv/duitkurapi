@@ -16,6 +16,7 @@ import {
 import { exportToFile, importFromFile } from '../lib/storage';
 import { createEmptyData } from '../lib/defaults';
 import { createDemoData } from '../lib/seed';
+import { isNative } from '../lib/platform';
 import type { Settings as SettingsType } from '../types';
 
 const CURRENCIES: { value: SettingsType['currency']; label: string }[] = [
@@ -220,6 +221,19 @@ export default function Settings() {
             <IconTrash size={16} /> Hapus Semua Data
           </button>
         </section>
+
+        {/* Tautan kebijakan privasi hanya ditampilkan pada versi web, tempat
+            berkasnya bisa dibuka di tab baru. Pada aplikasi Android berkas itu
+            satu asal dengan aplikasi, sehingga membukanya justru akan
+            menggeser tampilan aplikasi. */}
+        {!isNative() && (
+          <button
+            className="btn secondary block mt-16"
+            onClick={() => window.open('./privacy.html', '_blank', 'noopener,noreferrer')}
+          >
+            🔒 Kebijakan Privasi
+          </button>
+        )}
 
         <p className="fs-12 text-muted text-center mt-16" style={{ lineHeight: 1.6, paddingBottom: 10 }}>
           <strong>Duitku</strong> v1.0.0<br />

@@ -200,7 +200,9 @@ npm run android:sync   # hanya menyalin build terbaru ke proyek Android
 ```
 
 Panduan lengkapnya — dari menjalankan di HP sampai menerbitkan ke Play Store — ada di
-[`ANDROID.md`](ANDROID.md).
+[`ANDROID.md`](ANDROID.md), dan daftar persiapan rilis beserta teks listing siap pakai ada di
+[`PLAYSTORE.md`](PLAYSTORE.md). Aset toko (ikon 512×512, feature graphic, dan 7 tangkapan layar
+1080×1920 dari aplikasi sungguhan) sudah tersedia di folder `store/`.
 
 Seluruh perbedaan platform terkumpul di [`src/lib/platform.ts`](src/lib/platform.ts), dan setiap
 fungsi di sana selalu punya jalur web yang bekerja:
@@ -217,6 +219,12 @@ Hasil build ada di folder `dist/` dan sepenuhnya statis — bisa langsung di-hos
 GitHub Pages, Netlify, Vercel, Cloudflare Pages, atau server apa pun.
 
 Aplikasi memakai `HashRouter` dan `base: './'`, jadi **tidak perlu konfigurasi rewrite di server.**
+
+**Penerbitan otomatis ke GitHub Pages** sudah disiapkan lewat
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). Aktifkan sekali di
+**Settings → Pages → Source: GitHub Actions**, setelah itu setiap dorongan ke branch utama
+menerbitkan ulang aplikasi sekaligus halaman kebijakan privasi di `/privacy.html` —
+URL itulah yang dibutuhkan Play Store.
 
 ---
 
