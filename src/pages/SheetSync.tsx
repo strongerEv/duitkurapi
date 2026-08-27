@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { useToast } from '../components/Toast';
 import { PageHeader } from '../components/Common';
-import { IconCheck, IconCopy, IconDownload, IconUpload } from '../components/Icons';
+import { IconCheck, IconCopy, IconDownload, IconFileText, IconUpload } from '../components/Icons';
 import {
   countRows,
   isValidScriptUrl,
@@ -11,6 +11,7 @@ import {
   testConnection,
   type SyncResult,
 } from '../lib/sheets';
+import { downloadGuidePdf } from '../lib/guidePdf';
 import { formatDate, formatTime } from '../lib/date';
 // Kode Apps Script dibaca langsung dari berkas sumbernya, supaya tombol salin
 // di aplikasi tidak pernah berbeda dengan google-apps-script/Code.gs.
@@ -59,6 +60,7 @@ export default function SheetSync() {
   const [busy, setBusy] = useState<'idle' | 'test' | 'sync'>('idle');
   const [result, setResult] = useState<SyncResult | null>(null);
   const [guideOpen, setGuideOpen] = useState(!saved.url);
+  const [panduanBusy, setPanduanBusy] = useState(false);
 
   const rowCount = useMemo(() => countRows(data), [data]);
   const urlOk = !url || isValidScriptUrl(url);
@@ -66,6 +68,32 @@ export default function SheetSync() {
 
   const simpanKredensial = (patch: Partial<typeof saved>) => {
     updateSettings({ sheetSync: { ...data.settings.sheetSync, ...patch } });
+  };
+
+  const unduhKode = () => {
+    const blob = new Blob([appsScriptSource], { type: 'text/plain;charset=utf-8' });
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = 'Code.gs';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.setTimeout(() => URL.revokeObjectURL(href), 3000);
+    toast('Code.gs diunduh', 'success');
+  };
+
+  const unduhPanduan = async () => {
+    setPanduanBusy(true);
+    try {
+      const nama = await downloadGuidePdf();
+      toast(`Panduan tersimpan: ${nama}`, 'success');
+    } catch (err) {
+      console.error('[Duitku] Gagal membuat panduan PDF', err);
+      toast('Gagal membuat panduan PDF', 'error');
+    } finally {
+      setPanduanBusy(false);
+    }
   };
 
   const salin = async (text: string, label: string) => {
@@ -211,25 +239,16 @@ export default function SheetSync() {
               <button className="btn secondary" onClick={() => void salin(appsScriptSource, 'Kode Apps Script')}>
                 <IconCopy size={16} /> Salin Kode
               </button>
-              <button
-                className="btn secondary"
-                onClick={() => {
-                  const blob = new Blob([appsScriptSource], { type: 'text/plain' });
-                  const href = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = href;
-                  a.download = 'Code.gs';
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  window.setTimeout(() => URL.revokeObjectURL(href), 3000);
-                  toast('Code.gs diunduh', 'success');
-                }}
-              >
+              <button className="btn secondary" onClick={unduhKode}>
                 <IconDownload size={16} /> Unduh Code.gs
               </button>
             </div>
+            <button className="btn outline block" onClick={() => void unduhPanduan()} disabled={panduanBusy}>
+              <IconFileText size={16} /> {panduanBusy ? 'Menyiapkan panduan…' : 'Unduh Panduan Lengkap (PDF)'}
+            </button>
             <p className="field-hint text-center">
+              Panduan PDF berisi langkah bergambar nomor, tabel isi spreadsheet, dan daftar solusi bila ada
+              yang tidak beres — enak dibaca sambil mengerjakan di layar lain, atau diteruskan ke orang lain.
               Kode ini juga tersedia di repositori pada berkas <code>google-apps-script/Code.gs</code>.
             </p>
           </section>

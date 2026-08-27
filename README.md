@@ -118,6 +118,10 @@ lengkap dengan tombol salin kode. **Tidak ada satu baris pun di `Code.gs` yang p
    (di sini tidak ada pilihan fungsi; Apps Script memakai `doGet`/`doPost` otomatis)
 6. Tempel URL `/exec` dan token di aplikasi, tekan **Tes Koneksi** lalu **Kirim ke Spreadsheet**
 
+📘 Panduan lengkapnya ada di [`google-apps-script/PANDUAN.md`](google-apps-script/PANDUAN.md),
+dan bisa diunduh sebagai **PDF** langsung dari dalam aplikasi (Pengaturan → Hubungkan ke Spreadsheet
+→ Unduh Panduan Lengkap) — enak dibaca sambil mengerjakan di layar lain, atau diteruskan ke orang lain.
+
 Token dibuat acak oleh script dan disimpan di **Script Properties**, bukan di dalam kode. Setelah
 spreadsheet dimuat ulang sekali, tersedia menu **Duitku** di spreadsheet berisi *Siapkan Sheet*,
 *Lihat Token*, dan *Buat Token Baru*. Mengganti token **tidak memerlukan deploy ulang** — cukup
@@ -208,6 +212,7 @@ src/
 │   ├── wa.ts                   ★ Normalisasi nomor WA, render template, buat link wa.me
 │   ├── pdf.ts                  ★ Penyusun laporan PDF (tata letak, tabel, grafik vektor)
 │   ├── sheets.ts               ★ Penyusun & pengirim data ke Google Sheets
+│   ├── guidePdf.ts             Panduan integrasi spreadsheet dalam bentuk PDF
 │   ├── calc.ts                 Perhitungan saldo, hutang, anggaran, statistik
 │   ├── date.ts                 Format tanggal Indonesia & "lama hutang" versi manusia
 │   ├── format.ts               Format mata uang & input nominal
