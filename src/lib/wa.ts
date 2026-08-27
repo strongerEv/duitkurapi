@@ -2,6 +2,7 @@ import type { Debt, MessageTemplate, Settings } from '../types';
 import { formatMoney } from './format';
 import { daysBetween, formatDateLong, humanizeDuration, todayISO } from './date';
 import { debtPaid, debtRemaining } from './calc';
+import { openExternal } from './platform';
 
 /**
  * Normalisasi nomor WhatsApp ke format internasional tanpa tanda `+`.
@@ -105,9 +106,15 @@ export function buildWhatsAppUrl(phone: string, message: string, countryCode = '
   return `https://wa.me/${to}?text=${encodeURIComponent(message)}`;
 }
 
-/** Membuka WhatsApp di tab baru. Dipisah agar mudah dites/di-mock. */
+/**
+ * Membuka WhatsApp dengan pesan yang sudah terisi.
+ *
+ * Di web tautan dibuka pada tab baru. Di aplikasi Android tautan diserahkan
+ * ke sistem sebagai intent, sehingga langsung membuka aplikasi WhatsApp
+ * alih-alih memuat wa.me di dalam WebView aplikasi kita.
+ */
 export function openWhatsApp(url: string): void {
-  window.open(url, '_blank', 'noopener,noreferrer');
+  void openExternal(url);
 }
 
 /** Template bawaan: sopan, tegas, jatuh tempo, terima kasih, dan cicilan. */

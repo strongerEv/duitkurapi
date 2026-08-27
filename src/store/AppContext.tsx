@@ -10,7 +10,8 @@ import type {
   Transaction,
   Wallet,
 } from '../types';
-import { loadData, saveData } from '../lib/storage';
+import { loadData, restoreFromDeviceIfEmpty, saveData } from '../lib/storage';
+import { initNativeShell } from '../lib/platform';
 import { uid } from '../lib/id';
 import { todayISO } from '../lib/date';
 import { debtPaid } from '../lib/calc';
@@ -74,6 +75,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     document.documentElement.dataset.theme = data.settings.theme;
   }, [data.settings.theme]);
+
+  // Sesuaikan status bar aplikasi Android dan tutup splash screen.
+  useEffect(() => {
+    void initNativeShell(data.settings.theme);
+  }, [data.settings.theme]);
+
+  // Pada aplikasi Android, penyimpanan WebView bisa terhapus sistem. Bila
+  // ternyata kosong, coba pulihkan dari salinan di perangkat.
+  useEffect(() => {
+    let batal = false;
+    void restoreFromDeviceIfEmpty(loadData()).then((pulihan) => {
+      if (pulihan && !batal) setData(pulihan);
+    });
+    return () => {
+      batal = true;
+    };
+    // Sengaja hanya sekali saat aplikasi dijalankan.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const replaceAll = useCallback((next: AppData) => {
     setData(next);

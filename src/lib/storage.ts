@@ -1,5 +1,6 @@
 import type { AppData } from '../types';
 import { DATA_VERSION, createEmptyData } from './defaults';
+import { mirrorToDevice, readDeviceMirror, saveFile } from './platform';
 
 const STORAGE_KEY = 'duitku:data:v1';
 
@@ -17,11 +18,43 @@ export function loadData(): AppData {
 }
 
 export function saveData(data: AppData): void {
+  const serialized = JSON.stringify(data);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(STORAGE_KEY, serialized);
   } catch (err) {
     // Kuota penuh atau mode privat: jangan sampai aplikasi mati.
     console.warn('[Duitku] Gagal menyimpan data.', err);
+  }
+  // Di Android disalin juga ke penyimpanan perangkat; di web tidak berefek.
+  void mirrorToDevice(serialized);
+}
+
+/**
+ * Memulihkan data dari salinan perangkat bila penyimpanan WebView kosong.
+ *
+ * Android sesekali membersihkan penyimpanan WebView saat ruang menipis, dan
+ * pemasangan ulang selalu mengosongkannya. Salinan di Preferences ikut serta
+ * dalam Android Auto Backup, sehingga catatan pengguna punya peluang kembali.
+ * Mengembalikan data pulihan, atau null bila tidak ada yang perlu dipulihkan.
+ */
+export async function restoreFromDeviceIfEmpty(current: AppData): Promise<AppData | null> {
+  const kosong =
+    current.transactions.length === 0 && current.debts.length === 0 && !current.settings.userName;
+  if (!kosong) return null;
+
+  const serialized = await readDeviceMirror();
+  if (!serialized) return null;
+
+  try {
+    const parsed = migrate(JSON.parse(serialized) as Partial<AppData>);
+    const adaIsinya =
+      parsed.transactions.length > 0 || parsed.debts.length > 0 || Boolean(parsed.settings.userName);
+    if (!adaIsinya) return null;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+    return parsed;
+  } catch (err) {
+    console.warn('[Duitku] Salinan perangkat tidak bisa dibaca.', err);
+    return null;
   }
 }
 
@@ -70,18 +103,13 @@ function mergeCategories(defaults: AppData['categories'], saved: AppData['catego
   return [...saved, ...missingBuiltIns];
 }
 
-/** Mengunduh seluruh data sebagai file JSON cadangan. */
-export function exportToFile(data: AppData): void {
+/** Menyimpan seluruh data sebagai berkas JSON cadangan. */
+export async function exportToFile(data: AppData): Promise<string> {
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+  const fileName = `duitku-backup-${stamp}.json`;
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `duitku-backup-${stamp}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  await saveFile(blob, fileName, { title: 'Cadangan Duitku', dialogTitle: 'Simpan cadangan' });
+  return fileName;
 }
 
 /** Membaca file cadangan JSON menjadi AppData. */

@@ -29,6 +29,7 @@ import {
 } from './date';
 import { formatMoney, formatNumber, formatPercent } from './format';
 import { prettyPhone } from './wa';
+import { saveFile } from './platform';
 
 /* ------------------------------------------------------------------ */
 /* Konfigurasi tampilan                                                */
@@ -792,18 +793,13 @@ export async function buildReportPdf(input: ReportInput): Promise<{ blob: Blob; 
   return { blob: doc.output('blob'), fileName };
 }
 
-/** Membuat berkas PDF lalu memicu unduhan di browser. */
+/**
+ * Membuat berkas PDF lalu menyerahkannya ke pengguna: unduhan biasa di web,
+ * atau lembar berbagi Android bila dijalankan sebagai aplikasi.
+ */
 export async function downloadReportPdf(input: ReportInput): Promise<string> {
   const { blob, fileName } = await buildReportPdf(input);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  // Beri jeda agar unduhan sempat dimulai sebelum URL dilepas.
-  window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+  await saveFile(blob, fileName, { title: 'Laporan Keuangan Duitku', dialogTitle: 'Simpan atau bagikan laporan' });
   return fileName;
 }
 

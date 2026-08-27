@@ -12,6 +12,7 @@ import {
   type SyncResult,
 } from '../lib/sheets';
 import { downloadGuidePdf } from '../lib/guidePdf';
+import { saveFile } from '../lib/platform';
 import { formatDate, formatTime } from '../lib/date';
 // Kode Apps Script dibaca langsung dari berkas sumbernya, supaya tombol salin
 // di aplikasi tidak pernah berbeda dengan google-apps-script/Code.gs.
@@ -70,17 +71,14 @@ export default function SheetSync() {
     updateSettings({ sheetSync: { ...data.settings.sheetSync, ...patch } });
   };
 
-  const unduhKode = () => {
+  const unduhKode = async () => {
     const blob = new Blob([appsScriptSource], { type: 'text/plain;charset=utf-8' });
-    const href = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = href;
-    a.download = 'Code.gs';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.setTimeout(() => URL.revokeObjectURL(href), 3000);
-    toast('Code.gs diunduh', 'success');
+    try {
+      await saveFile(blob, 'Code.gs', { title: 'Kode Apps Script Duitku', dialogTitle: 'Simpan Code.gs' });
+      toast('Code.gs tersimpan', 'success');
+    } catch {
+      toast('Gagal menyimpan Code.gs', 'error');
+    }
   };
 
   const unduhPanduan = async () => {
@@ -239,7 +237,7 @@ export default function SheetSync() {
               <button className="btn secondary" onClick={() => void salin(appsScriptSource, 'Kode Apps Script')}>
                 <IconCopy size={16} /> Salin Kode
               </button>
-              <button className="btn secondary" onClick={unduhKode}>
+              <button className="btn secondary" onClick={() => void unduhKode()}>
                 <IconDownload size={16} /> Unduh Code.gs
               </button>
             </div>

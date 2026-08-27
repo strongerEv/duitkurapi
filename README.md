@@ -190,6 +190,27 @@ npm run build
 npm run preview
 ```
 
+### 📱 Membangun sebagai aplikasi Android
+
+Duitku dibungkus dengan **Capacitor**, jadi satu basis kode melayani web dan Android sekaligus.
+
+```bash
+npm run android        # build + sync + buka Android Studio
+npm run android:sync   # hanya menyalin build terbaru ke proyek Android
+```
+
+Panduan lengkapnya — dari menjalankan di HP sampai menerbitkan ke Play Store — ada di
+[`ANDROID.md`](ANDROID.md).
+
+Seluruh perbedaan platform terkumpul di [`src/lib/platform.ts`](src/lib/platform.ts), dan setiap
+fungsi di sana selalu punya jalur web yang bekerja:
+
+| Kemampuan | Web | Android |
+|---|---|---|
+| Simpan PDF & cadangan | Unduhan biasa | Lembar berbagi — simpan ke Files/Drive atau kirim lewat WhatsApp |
+| Tautan `wa.me` | Tab baru | Intent sistem, langsung membuka aplikasi WhatsApp |
+| Penyimpanan data | `localStorage` | `localStorage` + salinan yang ikut Android Auto Backup |
+
 ### Deploy
 
 Hasil build ada di folder `dist/` dan sepenuhnya statis — bisa langsung di-hosting di
@@ -213,6 +234,7 @@ src/
 │   ├── pdf.ts                  ★ Penyusun laporan PDF (tata letak, tabel, grafik vektor)
 │   ├── sheets.ts               ★ Penyusun & pengirim data ke Google Sheets
 │   ├── guidePdf.ts             Panduan integrasi spreadsheet dalam bentuk PDF
+│   ├── platform.ts             ★ Pembeda perilaku web vs aplikasi Android
 │   ├── calc.ts                 Perhitungan saldo, hutang, anggaran, statistik
 │   ├── date.ts                 Format tanggal Indonesia & "lama hutang" versi manusia
 │   ├── format.ts               Format mata uang & input nominal

@@ -183,7 +183,14 @@ export default function Settings() {
             catatanmu tidak hilang jika browser dibersihkan atau ganti HP.
           </p>
           <div className="btn-row">
-            <button className="btn secondary" onClick={() => { exportToFile(data); toast('Cadangan diunduh', 'success'); }}>
+            <button
+              className="btn secondary"
+              onClick={() => {
+                void exportToFile(data)
+                  .then(() => toast('Cadangan tersimpan', 'success'))
+                  .catch(() => toast('Gagal menyimpan cadangan', 'error'));
+              }}
+            >
               <IconDownload size={16} /> Unduh
             </button>
             <button className="btn secondary" onClick={() => fileRef.current?.click()}>

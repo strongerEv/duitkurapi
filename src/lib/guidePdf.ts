@@ -1,3 +1,5 @@
+import { saveFile } from './platform';
+
 /**
  * Penyusun "Panduan Integrasi Google Spreadsheet" dalam bentuk PDF.
  *
@@ -422,16 +424,9 @@ export async function buildGuidePdf(): Promise<{ blob: Blob; fileName: string }>
   return { blob: doc.output('blob'), fileName: 'Duitku-Panduan-Integrasi-Spreadsheet.pdf' };
 }
 
-/** Membuat panduan lalu memicu unduhan di browser. */
+/** Membuat panduan lalu menyerahkannya ke pengguna (unduh di web, bagikan di Android). */
 export async function downloadGuidePdf(): Promise<string> {
   const { blob, fileName } = await buildGuidePdf();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+  await saveFile(blob, fileName, { title: 'Panduan Integrasi Duitku', dialogTitle: 'Simpan atau bagikan panduan' });
   return fileName;
 }
