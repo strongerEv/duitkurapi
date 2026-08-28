@@ -9,7 +9,9 @@ name: Deploy ke GitHub Pages
 
 on:
   push:
-    branches: [main, master]
+    # Termasuk branch pengembangan, karena repositori ini memakainya
+    # sebagai branch utama.
+    branches: [main, master, 'claude/duitku-finance-app-l2yisn']
   # Bisa juga dijalankan manual dari tab Actions.
   workflow_dispatch:
 
