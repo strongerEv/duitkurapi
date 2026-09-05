@@ -78,6 +78,8 @@ export function migrate(input: Partial<AppData>): AppData {
   }
   // Data lama belum mengenal sinkronisasi spreadsheet.
   settings.sheetSync = { ...base.settings.sheetSync, ...(input.settings?.sheetSync ?? {}) };
+  // Berkas cadangan versi lama belum punya kunci ini, jadi asisten tetap menyala.
+  settings.assistantEnabled = typeof settings.assistantEnabled === 'boolean' ? settings.assistantEnabled : true;
   return {
     version: DATA_VERSION,
     settings,

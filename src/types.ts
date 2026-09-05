@@ -114,6 +114,8 @@ export interface Settings {
   /** Template pesan penagihan. Mendukung placeholder, lihat `lib/wa.ts`. */
   reminderTemplates: MessageTemplate[];
   theme: 'light' | 'dark';
+  /** Tampilkan tombol mengambang Asisten Duitku. */
+  assistantEnabled: boolean;
   /** Sinkronisasi ke Google Sheets lewat Apps Script. */
   sheetSync: SheetSyncSettings;
 }

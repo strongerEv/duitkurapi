@@ -44,6 +44,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultCountryCode: '62',
   reminderTemplates: DEFAULT_TEMPLATES,
   theme: 'light',
+  assistantEnabled: true,
   sheetSync: { url: '', token: '' },
 };
 

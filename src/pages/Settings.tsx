@@ -114,6 +114,26 @@ export default function Settings() {
           </select>
         </div>
 
+        {/* Asisten */}
+        <div className="section-head"><h2 className="section-title">Asisten Duitku</h2></div>
+        <section className="card" style={{ padding: '2px 16px' }}>
+          <div className="switch-row">
+            <div className="f1">
+              <div className="switch-label">Tombol asisten mengambang</div>
+              <div className="switch-desc">
+                {s.assistantEnabled
+                  ? 'Tombol ✨ muncul di pojok kanan bawah. Tanya apa saja soal keuanganmu.'
+                  : 'Tombol ✨ disembunyikan. Nyalakan lagi kapan pun tanpa kehilangan data.'}
+              </div>
+            </div>
+            <Switch
+              checked={s.assistantEnabled}
+              onChange={(on) => updateSettings({ assistantEnabled: on })}
+              label="Tombol asisten mengambang"
+            />
+          </div>
+        </section>
+
         {/* Data master */}
         <div className="section-head"><h2 className="section-title">Data master</h2></div>
         <section className="card" style={{ padding: 0, overflow: 'hidden' }}>

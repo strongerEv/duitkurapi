@@ -48,9 +48,9 @@ export default function App() {
         <Route path="/pengaturan/spreadsheet" element={<SheetSync />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      {/* Asisten selalu tersedia, kecuali saat mengisi formulir agar tidak
-          menutupi tombol simpan. */}
-      {!fullScreen && <AiChat />}
+      {/* Asisten disembunyikan saat mengisi formulir agar tidak menutupi
+          tombol simpan, dan bisa dimatikan lewat Pengaturan. */}
+      {!fullScreen && data.settings.assistantEnabled && <AiChat />}
       {!fullScreen && <BottomNav />}
     </div>
   );
