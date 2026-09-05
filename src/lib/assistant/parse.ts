@@ -98,9 +98,33 @@ export function parsePeriod(text: string, transactions: AppData['transactions'])
    * ("kemarin"), kalau tidak akan tertangkap sebagai hari kemarin.
    */
 
-  if (has(text, 'bulan ini', 'sebulan ini')) {
+  /*
+   * "Bandingkan dengan bulan lalu" menyebut bulan lalu sebagai pembanding,
+   * bukan sebagai periode yang ditanyakan. Tanpa aturan ini, jawabannya jadi
+   * membandingkan bulan lalu dengan dua bulan lalu — bukan yang dimaksud.
+   */
+  const sebagaiPembanding = /\b(dengan|dibanding|dibandingkan|banding|bandingkan|vs|versus|sama)\s+(bulan|minggu|tahun)\s+(lalu|kemarin)\b/.test(text);
+
+  if (has(text, 'bulan ini', 'sebulan ini') || (sebagaiPembanding && has(text, 'bulan lalu', 'bulan kemarin'))) {
     const p = monthPeriod(currentMonthKey());
     return { ...p, label: 'bulan ini' };
+  }
+
+  if (sebagaiPembanding && has(text, 'minggu lalu', 'minggu kemarin')) {
+    const range = weekRangeOf(today);
+    const prev = weekRangeOf(shiftDays(today, -7));
+    return { label: 'minggu ini', range, previous: { label: 'minggu lalu', range: prev }, implicit: false };
+  }
+
+  if (sebagaiPembanding && has(text, 'tahun lalu', 'tahun kemarin')) {
+    const year = String(new Date().getFullYear());
+    const prevYear = String(Number(year) - 1);
+    return {
+      label: `tahun ${year}`,
+      range: yearRangeOf(year),
+      previous: { label: `tahun ${prevYear}`, range: yearRangeOf(prevYear) },
+      implicit: false,
+    };
   }
 
   if (has(text, 'minggu ini', 'pekan ini', 'seminggu ini', 'seminggu')) {
@@ -293,6 +317,34 @@ export function parseQuestion(raw: string, data: AppData): ParsedQuestion {
 
   const intent = detectIntent(text, Boolean(category));
 
+  /*
+   * Arah pertanyaan hutang. "Apakah saya punya hutang" menanyakan kewajiban
+   * pengguna sendiri, sedangkan "siapa yang belum bayar" menanyakan uang yang
+   * dipegang orang lain. Dua-duanya sebelumnya dijawab sama, dan itu keliru.
+   */
+  const tanyaMilikOrang = has(
+    text, 'piutang', 'piutangnya', 'hutang ke saya', 'utang ke saya', 'ngutang ke saya',
+    'hutang ke aku', 'utang ke aku', 'yang hutang', 'yang ngutang', 'yang belum bayar',
+    'siapa yang', 'nagih', 'menagih', 'ditagih', 'penagihan', 'tertagih', 'dipinjam',
+  );
+  const tanyaMilikSaya = has(
+    text, 'hutang saya', 'utang saya', 'hutangku', 'utangku', 'hutang aku', 'utang aku',
+    'saya punya hutang', 'saya punya utang', 'saya ada hutang', 'saya ada utang',
+    'aku punya hutang', 'aku ada hutang', 'saya berhutang', 'aku berhutang',
+    'saya ngutang', 'aku ngutang', 'hutang saya ke', 'saya harus bayar',
+  );
+  // "hutang piutang" adalah satu ungkapan yang berarti dua-duanya sekaligus.
+  const tanyaKeduanya = has(text, 'hutang piutang', 'utang piutang', 'piutang hutang', 'hutang dan piutang');
+
+  const debtSide: 'mine' | 'theirs' | 'both' =
+    tanyaKeduanya || (tanyaMilikOrang && tanyaMilikSaya)
+      ? 'both'
+      : tanyaMilikOrang
+        ? 'theirs'
+        : tanyaMilikSaya
+          ? 'mine'
+          : 'both';
+
   // Nama orang pada pertanyaan hutang: cocokkan dengan daftar yang ada.
   let personName: string | undefined;
   if (intent === 'debt') {
@@ -312,5 +364,6 @@ export function parseQuestion(raw: string, data: AppData): ParsedQuestion {
     flow,
     flowExplicit: incomeWords || expenseWords,
     personName,
+    debtSide,
   };
 }

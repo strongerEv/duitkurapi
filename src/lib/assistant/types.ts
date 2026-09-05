@@ -37,6 +37,11 @@ export interface ParsedQuestion {
   flowExplicit: boolean;
   /** Nama orang pada pertanyaan seputar hutang. */
   personName?: string;
+  /**
+   * Arah pertanyaan hutang: `mine` untuk hutang milik pengguna sendiri,
+   * `theirs` untuk uang yang dipinjam orang lain, `both` bila tidak jelas.
+   */
+  debtSide: 'mine' | 'theirs' | 'both';
 }
 
 /* ------------------------------------------------------------------ */

@@ -24,9 +24,9 @@ export function greeting(data: AppData): Answer {
   const kosong = data.transactions.length === 0;
   if (kosong) {
     return {
-      text: `Halo ${nama}! Saya asisten keuanganmu. Begitu ada transaksi tercatat, saya bisa langsung menganalisisnya untukmu.`,
+      text: `Halo ${nama}! Aku asisten keuanganmu. Begitu ada transaksi yang kamu catat, langsung aku bantu analisis 👋`,
       blocks: [],
-      suggestions: ['Kamu bisa bantu apa saja?'],
+      suggestions: ['Kamu bisa bantu apa aja?'],
     };
   }
   return ask('kamu bisa apa saja', data);

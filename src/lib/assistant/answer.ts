@@ -15,8 +15,12 @@ import { formatMoney, formatPercent } from '../format';
 import type { Answer, AnswerBlock, ParsedPeriod, ParsedQuestion } from './types';
 
 /**
- * Perakit jawaban. Setiap angka dihitung langsung dari catatan pengguna,
- * jadi tidak ada kemungkinan salah hitung maupun mengarang data.
+ * Perakit jawaban.
+ *
+ * Angkanya dihitung langsung dari catatan pengguna, tapi cara menyampaikannya
+ * sengaja dibuat seperti teman yang lagi bantu lihat-lihat pengeluaran —
+ * pakai "kamu", kalimat pendek, dan sesekali bereaksi. Bukan seperti laporan
+ * bank.
  */
 
 interface Ctx {
@@ -31,17 +35,28 @@ function makeCtx(data: AppData): Ctx {
 
 const txIn = (data: AppData, range: DateRange) => filterByRange(data.transactions, range.from, range.to);
 
-/** Menyusun kalimat perubahan: naik/turun berapa persen. */
-function deltaSentence(now: number, before: number): { text: string; good: boolean; flat: boolean } {
-  if (before === 0 && now === 0) return { text: 'sama-sama nol', good: true, flat: true };
-  if (before === 0) return { text: 'naik dari nol', good: false, flat: false };
+/** Memilih satu dari beberapa variasi kalimat, biar tidak terdengar seperti robot. */
+function pick(...opts: string[]): string {
+  return opts[Math.floor(Math.random() * opts.length)];
+}
+
+/** "bulan ini" tetap huruf kecil di tengah kalimat, tapi kapital di awal. */
+function kapital(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Menyusun keterangan perubahan dengan bahasa sehari-hari. */
+function delta(now: number, before: number): { text: string; turun: boolean; datar: boolean; pct: number } {
+  if (before === 0 && now === 0) return { text: 'sama-sama kosong', turun: false, datar: true, pct: 0 };
+  if (before === 0) return { text: 'baru ada bulan ini', turun: false, datar: false, pct: 100 };
   const diff = now - before;
   const pct = Math.abs(diff / before) * 100;
-  if (pct < 1) return { text: 'nyaris tidak berubah', good: true, flat: true };
+  if (pct < 1) return { text: 'hampir sama persis', turun: false, datar: true, pct };
   return {
     text: `${diff > 0 ? 'naik' : 'turun'} ${formatPercent(pct, 0)}`,
-    good: diff < 0,
-    flat: false,
+    turun: diff < 0,
+    datar: false,
+    pct,
   };
 }
 
@@ -52,52 +67,68 @@ function deltaSentence(now: number, before: number): { text: string; good: boole
 function answerMetric(q: ParsedQuestion, ctx: Ctx): Answer {
   const { data, money } = ctx;
   const scoped = txIn(data, q.period.range);
-  const flowLabel = q.flow === 'income' ? 'Pemasukan' : 'Pengeluaran';
+  const masuk = q.flow === 'income';
 
   const relevant = scoped.filter(
     (t) => t.type === q.flow && (q.categoryId ? t.categoryId === q.categoryId : true),
   );
   const total = relevant.reduce((s, t) => s + t.amount, 0);
-  const subject = q.categoryName ? `${flowLabel.toLowerCase()} ${q.categoryName}` : flowLabel.toLowerCase();
+  const label = q.categoryName ?? (masuk ? 'Pemasukan' : 'Pengeluaran');
 
   const blocks: AnswerBlock[] = [
     {
       kind: 'stat',
-      label: `${q.categoryName ?? flowLabel} · ${q.period.label}`,
+      label: `${label} · ${q.period.label}`,
       value: money(total),
       sub: `${relevant.length} transaksi · ${formatRange(q.period.range)}`,
-      tone: q.flow === 'income' ? 'in' : 'out',
+      tone: masuk ? 'in' : 'out',
     },
   ];
 
   if (relevant.length === 0) {
+    const apa = q.categoryName ? `pengeluaran ${q.categoryName}` : masuk ? 'pemasukan' : 'pengeluaran';
     return {
-      text: `Belum ada catatan ${subject} pada ${q.period.label}.`,
+      text: pick(
+        `Kosong — nggak ada ${apa} ${q.period.label}.`,
+        `Nggak ada catatan ${apa} ${q.period.label}. Bersih.`,
+        `Belum ada ${apa} ${q.period.label} nih.`,
+      ),
       blocks,
-      suggestions: [`${flowLabel} bulan lalu berapa?`, 'Pengeluaran terbesar bulan ini apa?'],
+      suggestions: [
+        q.categoryName ? `${kapital(q.categoryName)} bulan lalu berapa?` : 'Coba bulan lalu',
+        'Yang paling boros apa?',
+      ],
     };
   }
 
-  // Perbandingan dengan periode sebelumnya, kalau ada.
+  // Perbandingan dengan periode sebelumnya.
+  let ekor = '';
   if (q.period.previous) {
     const before = txIn(data, q.period.previous.range)
       .filter((t) => t.type === q.flow && (q.categoryId ? t.categoryId === q.categoryId : true))
       .reduce((s, t) => s + t.amount, 0);
-    const d = deltaSentence(total, before);
+    const d = delta(total, before);
     blocks.push({
       kind: 'delta',
-      label: 'Dibanding periode sebelumnya',
+      label: 'Dibanding sebelumnya',
       fromLabel: q.period.previous.label,
       fromValue: money(before),
       toLabel: q.period.label,
       toValue: money(total),
       deltaText: d.text,
-      good: q.flow === 'income' ? !d.good : d.good,
-      flat: d.flat,
+      good: masuk ? !d.turun : d.turun,
+      flat: d.datar,
     });
+
+    if (!d.datar && before > 0) {
+      const bagus = masuk ? !d.turun : d.turun;
+      ekor = bagus
+        ? pick(` ${kapital(d.text)} dari ${q.period.previous.label} — mantap 👍`, ` Lebih baik dari ${q.period.previous.label}, ${d.text}.`)
+        : pick(` ${kapital(d.text)} dibanding ${q.period.previous.label} nih.`, ` Naiknya lumayan dibanding ${q.period.previous.label}.`);
+    }
   }
 
-  // Transaksi terbesar sebagai bukti, biar pengguna ingat uangnya ke mana.
+  // Transaksi terbesar sebagai bukti.
   const top = [...relevant].sort((a, b) => b.amount - a.amount).slice(0, 4);
   blocks.push({
     kind: 'list',
@@ -108,21 +139,30 @@ function answerMetric(q: ParsedQuestion, ctx: Ctx): Answer {
         title: t.note?.trim() || cat?.name || 'Transaksi',
         sub: formatDate(t.date),
         right: money(t.amount),
-        tone: q.flow === 'income' ? 'in' : 'out',
+        tone: masuk ? 'in' : 'out',
       };
     }),
   });
 
   const days = rangeLengthDays(q.period.range);
-  const perDay = total / days;
-  const extra = days > 2 ? ` Rata-rata ${money(perDay)} per hari.` : '';
+  const rata = days > 2 ? ` Kalau dirata-rata sekitar ${money(total / days)} sehari.` : '';
+
+  const inti = q.categoryName
+    ? pick(
+        `Buat ${q.categoryName} ${q.period.label} kamu ${masuk ? 'dapat' : 'habis'} ${money(total)}, dari ${relevant.length} transaksi.`,
+        `${kapital(q.categoryName)} ${q.period.label} totalnya ${money(total)} — ${relevant.length} transaksi.`,
+      )
+    : pick(
+        `${kapital(q.period.label)} kamu ${masuk ? 'dapat' : 'keluar'} ${money(total)} dari ${relevant.length} transaksi.`,
+        `Total ${masuk ? 'pemasukan' : 'pengeluaran'} ${q.period.label} ${money(total)}, dari ${relevant.length} transaksi.`,
+      );
 
   return {
-    text: `Total ${subject} ${q.period.label} adalah ${money(total)} dari ${relevant.length} transaksi.${extra}`,
+    text: inti + ekor + rata,
     blocks,
     suggestions: q.categoryName
-      ? [`Bandingkan ${q.categoryName} dengan bulan lalu`, 'Pengeluaran terbesar bulan ini apa?']
-      : ['Kategori apa yang paling boros?', 'Bandingkan dengan bulan lalu'],
+      ? [`Bandingkan ${q.categoryName} dengan bulan lalu`, 'Yang paling boros apa?']
+      : ['Yang paling boros apa?', 'Bandingkan dengan bulan lalu'],
   };
 }
 
@@ -134,19 +174,23 @@ function answerRanking(q: ParsedQuestion, ctx: Ctx): Answer {
   const { data, money } = ctx;
   const scoped = txIn(data, q.period.range);
   const breakdown = breakdownByCategory(scoped, data.categories, q.flow);
-  const flowLabel = q.flow === 'income' ? 'pemasukan' : 'pengeluaran';
+  const masuk = q.flow === 'income';
 
   if (breakdown.length === 0) {
     return {
-      text: `Belum ada ${flowLabel} tercatat pada ${q.period.label}.`,
+      text: pick(
+        `Belum ada ${masuk ? 'pemasukan' : 'pengeluaran'} ${q.period.label}, jadi belum ada yang bisa diurutkan.`,
+        `Kosong ${q.period.label} — nggak ada yang bisa dibandingkan.`,
+      ),
       blocks: [],
-      suggestions: ['Ringkas kondisi keuangan saya', 'Berapa saldo saya?'],
+      suggestions: ['Coba bulan lalu', 'Berapa saldo saya?'],
     };
   }
 
   const top = breakdown.slice(0, 6);
   const total = breakdown.reduce((s, b) => s + b.total, 0);
-  const first = top[0];
+  const juara = top[0];
+  const nama = juara.category?.name ?? 'Lainnya';
 
   const blocks: AnswerBlock[] = [
     {
@@ -161,32 +205,42 @@ function answerRanking(q: ParsedQuestion, ctx: Ctx): Answer {
     },
   ];
 
-  // Bandingkan kategori juara dengan periode sebelumnya.
-  if (q.period.previous && first.category) {
+  if (q.period.previous && juara.category) {
     const before = txIn(data, q.period.previous.range)
-      .filter((t) => t.type === q.flow && t.categoryId === first.categoryId)
+      .filter((t) => t.type === q.flow && t.categoryId === juara.categoryId)
       .reduce((s, t) => s + t.amount, 0);
-    const d = deltaSentence(first.total, before);
+    const d = delta(juara.total, before);
     blocks.push({
       kind: 'delta',
-      label: `${first.category.name} dibanding sebelumnya`,
+      label: `${nama} dibanding sebelumnya`,
       fromLabel: q.period.previous.label,
       fromValue: money(before),
       toLabel: q.period.label,
-      toValue: money(first.total),
+      toValue: money(juara.total),
       deltaText: d.text,
-      good: q.flow === 'income' ? !d.good : d.good,
-      flat: d.flat,
+      good: masuk ? !d.turun : d.turun,
+      flat: d.datar,
     });
   }
 
+  const porsi = juara.percent;
+  const komentar =
+    porsi > 50
+      ? ` Itu lebih dari separuh total pengeluaranmu lho.`
+      : porsi > 35
+        ? ` Porsinya lumayan gede, ${formatPercent(porsi, 0)} dari total.`
+        : ` Sekitar ${formatPercent(porsi, 0)} dari total ${money(total)}.`;
+
   return {
-    text:
-      `Yang paling menyedot ${flowLabel} ${q.period.label} adalah ${first.category?.name ?? 'Lainnya'}: ` +
-      `${money(first.total)}, atau ${formatPercent(first.percent, 0)} dari total ${money(total)}.`,
+    text: masuk
+      ? `Pemasukan terbesarmu ${q.period.label} dari ${nama}: ${money(juara.total)}.${komentar}`
+      : pick(
+          `Yang paling bikin dompet tipis ${q.period.label}: ${nama}, ${money(juara.total)}.${komentar}`,
+          `Juaranya ${nama} nih — ${money(juara.total)} ${q.period.label}.${komentar}`,
+        ),
     blocks,
     suggestions: [
-      first.category ? `Berapa pengeluaran ${first.category.name} bulan lalu?` : 'Bandingkan dengan bulan lalu',
+      juara.category ? `${kapital(juara.category.name)} bulan lalu berapa?` : 'Bandingkan dengan bulan lalu',
       'Ada saran biar lebih hemat?',
     ],
   };
@@ -203,35 +257,36 @@ function answerCompare(q: ParsedQuestion, ctx: Ctx): Answer {
     range: q.period.range,
   };
 
-  const pick = (range: DateRange) =>
+  const pick2 = (range: DateRange) =>
     txIn(data, range).filter((t) => t.type === q.flow && (q.categoryId ? t.categoryId === q.categoryId : true));
 
-  const nowTx = pick(q.period.range);
-  const beforeTx = pick(prev.range);
+  const nowTx = pick2(q.period.range);
+  const beforeTx = pick2(prev.range);
   const now = nowTx.reduce((s, t) => s + t.amount, 0);
   const before = beforeTx.reduce((s, t) => s + t.amount, 0);
-  const d = deltaSentence(now, before);
-  const subject = q.categoryName ?? (q.flow === 'income' ? 'Pemasukan' : 'Pengeluaran');
+  const d = delta(now, before);
+  const masuk = q.flow === 'income';
+  const subjek = q.categoryName ?? (masuk ? 'Pemasukan' : 'Pengeluaran');
+  const bagus = masuk ? !d.turun : d.turun;
 
   const blocks: AnswerBlock[] = [
     {
       kind: 'delta',
-      label: subject,
+      label: subjek,
       fromLabel: prev.label,
       fromValue: money(before),
       toLabel: q.period.label,
       toValue: money(now),
       deltaText: d.text,
-      good: q.flow === 'income' ? !d.good : d.good,
-      flat: d.flat,
+      good: bagus,
+      flat: d.datar,
     },
   ];
 
-  // Tanpa kategori tertentu, tunjukkan kategori mana yang paling berubah.
   if (!q.categoryId) {
     const nowBreak = breakdownByCategory(nowTx, data.categories, q.flow);
     const beforeBreak = breakdownByCategory(beforeTx, data.categories, q.flow);
-    const movers = nowBreak
+    const berubah = nowBreak
       .map((b) => {
         const was = beforeBreak.find((x) => x.categoryId === b.categoryId)?.total ?? 0;
         return { name: b.category?.name ?? 'Lainnya', icon: b.category?.icon, diff: b.total - was };
@@ -240,13 +295,13 @@ function answerCompare(q: ParsedQuestion, ctx: Ctx): Answer {
       .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
       .slice(0, 4);
 
-    if (movers.length > 0) {
+    if (berubah.length > 0) {
       blocks.push({
         kind: 'list',
-        items: movers.map((m) => ({
+        items: berubah.map((m) => ({
           icon: m.icon,
           title: m.name,
-          sub: m.diff > 0 ? 'bertambah' : 'berkurang',
+          sub: m.diff > 0 ? 'nambah' : 'berkurang',
           right: `${m.diff > 0 ? '+' : '-'}${money(Math.abs(m.diff))}`,
           tone: m.diff > 0 ? 'out' : 'in',
         })),
@@ -254,14 +309,24 @@ function answerCompare(q: ParsedQuestion, ctx: Ctx): Answer {
     }
   }
 
-  const arah = d.flat
-    ? 'praktis tidak berubah'
-    : `${d.text} (${money(Math.abs(now - before))})`;
+  if (d.datar) {
+    return {
+      text: `${subjek} ${q.period.label} dan ${prev.label} hampir sama, ${money(now)} banding ${money(before)}. Stabil.`,
+      blocks,
+      suggestions: ['Yang paling boros apa?', 'Ada saran biar lebih hemat?'],
+    };
+  }
+
+  const selisih = money(Math.abs(now - before));
+  const inti = `${subjek} ${q.period.label} ${money(now)}, ${prev.label} ${money(before)}.`;
+  const reaksi = bagus
+    ? pick(` ${kapital(d.text)} — hemat ${selisih} 👏`, ` Turun ${selisih}, bagus itu.`)
+    : pick(` ${kapital(d.text)}, nambah ${selisih} nih.`, ` Naik ${selisih} dibanding sebelumnya.`);
 
   return {
-    text: `${subject} ${q.period.label} ${money(now)}, sedangkan ${prev.label} ${money(before)} — ${arah}.`,
+    text: inti + reaksi,
     blocks,
-    suggestions: ['Kategori apa yang paling boros?', 'Ada saran biar lebih hemat?'],
+    suggestions: ['Yang paling boros apa?', 'Ada saran biar lebih hemat?'],
   };
 }
 
@@ -272,15 +337,18 @@ function answerCompare(q: ParsedQuestion, ctx: Ctx): Answer {
 function answerBalance(ctx: Ctx): Answer {
   const { data, money } = ctx;
   const total = totalBalance(data.wallets, data.transactions);
-  const active = data.wallets.filter((w) => !w.archived);
+  const aktif = data.wallets.filter((w) => !w.archived);
 
   return {
-    text: `Saldo seluruh dompetmu saat ini ${money(total)}.`,
+    text: pick(
+      `Total duitmu sekarang ${money(total)}, tersebar di ${aktif.length} dompet.`,
+      `Saldomu ${money(total)} — ini rinciannya per dompet:`,
+    ),
     blocks: [
       { kind: 'stat', label: 'Total saldo', value: money(total), tone: 'neutral' },
       {
         kind: 'list',
-        items: active.map((w) => ({
+        items: aktif.map((w) => ({
           icon: w.icon,
           title: w.name,
           sub: w.accountNumber,
@@ -288,7 +356,7 @@ function answerBalance(ctx: Ctx): Answer {
         })),
       },
     ],
-    suggestions: ['Ringkas kondisi keuangan saya', 'Berapa total piutang saya?'],
+    suggestions: ['Ringkas kondisi keuangan saya', 'Yang paling boros apa?'],
   };
 }
 
@@ -299,6 +367,7 @@ function answerBalance(ctx: Ctx): Answer {
 function answerDebt(q: ParsedQuestion, ctx: Ctx): Answer {
   const { data, money } = ctx;
 
+  // Pertanyaan tentang satu orang tertentu.
   if (q.personName) {
     const items = data.debts.filter((d) => d.personName === q.personName);
     const sisa = items.reduce((s, d) => s + debtRemaining(d), 0);
@@ -306,21 +375,21 @@ function answerDebt(q: ParsedQuestion, ctx: Ctx): Answer {
     return {
       text:
         sisa > 0
-          ? `${q.personName} masih punya sisa ${money(sisa)} dari ${aktif.length} catatan aktif.`
-          : `Semua catatan ${q.personName} sudah lunas.`,
+          ? `${q.personName} masih sisa ${money(sisa)}${aktif.length > 1 ? ` dari ${aktif.length} catatan` : ''}.`
+          : `${q.personName} udah lunas semua. Aman ✅`,
       blocks: [
         {
           kind: 'list',
           items: items.map((d) => ({
             icon: d.type === 'receivable' ? '📥' : '📤',
-            title: d.type === 'receivable' ? 'Berhutang ke kamu' : 'Kamu berhutang',
-            sub: `sejak ${formatDate(d.date)} · ${humanizeDuration(debtAgeDays(d))}`,
+            title: d.type === 'receivable' ? 'Dia pinjam ke kamu' : 'Kamu pinjam ke dia',
+            sub: `sejak ${formatDate(d.date)} · udah ${humanizeDuration(debtAgeDays(d))}`,
             right: money(debtRemaining(d)),
             tone: d.status === 'paid' ? 'in' : isOverdue(d) ? 'warn' : 'neutral',
           })),
         },
       ],
-      suggestions: ['Siapa yang paling lama belum bayar?', 'Berapa total piutang saya?'],
+      suggestions: ['Siapa yang paling lama belum bayar?', 'Total piutang saya berapa?'],
     };
   }
 
@@ -331,39 +400,113 @@ function answerDebt(q: ParsedQuestion, ctx: Ctx): Answer {
   const totalHutang = hutang.reduce((s, d) => s + debtRemaining(d), 0);
   const telat = piutang.filter(isOverdue);
 
-  const blocks: AnswerBlock[] = [
-    { kind: 'stat', label: 'Piutang belum tertagih', value: money(totalPiutang), sub: `${piutang.length} orang`, tone: 'in' },
-    { kind: 'stat', label: 'Hutangmu ke orang lain', value: money(totalHutang), sub: `${hutang.length} catatan`, tone: 'out' },
-  ];
+  /* --- Kasus kosong. Ini yang dulu keliru dijawab "Ada Rp0". --- */
 
-  const urut = [...piutang].sort((a, b) => debtAgeDays(b) - debtAgeDays(a)).slice(0, 5);
+  if (q.debtSide === 'mine' && totalHutang === 0) {
+    const pernah = data.debts.some((d) => d.type === 'payable');
+    return {
+      text: pernah
+        ? pick('Kamu lagi nggak punya hutang. Semuanya udah lunas ✅', 'Bersih — nggak ada hutang yang belum dibayar. Semua lunas 👍')
+        : pick('Kamu nggak punya hutang sama sekali 👍', 'Nggak ada catatan hutang atas namamu. Aman.'),
+      blocks:
+        totalPiutang > 0
+          ? [
+              {
+                kind: 'note',
+                tone: 'ok',
+                title: 'Tapi ada yang ngutang ke kamu',
+                text: `${money(totalPiutang)} masih dipegang ${piutang.length} orang. Tanya "siapa yang belum bayar?" kalau mau lihat.`,
+              },
+            ]
+          : [],
+      suggestions: totalPiutang > 0 ? ['Siapa yang belum bayar?'] : ['Ringkas kondisi keuangan saya'],
+    };
+  }
+
+  if (q.debtSide === 'theirs' && totalPiutang === 0) {
+    const pernah = data.debts.some((d) => d.type === 'receivable');
+    return {
+      text: pernah
+        ? pick('Nggak ada yang ngutang ke kamu sekarang. Semua udah balik ✅', 'Semua piutangmu udah lunas. Bersih 👍')
+        : 'Belum ada catatan orang yang ngutang ke kamu.',
+      blocks: [],
+      suggestions: ['Ringkas kondisi keuangan saya', 'Berapa saldo saya?'],
+    };
+  }
+
+  if (totalPiutang === 0 && totalHutang === 0) {
+    const pernah = data.debts.length > 0;
+    return {
+      text: pernah
+        ? pick('Bersih! Nggak ada hutang, nggak ada piutang. Semua udah lunas 🎉', 'Semuanya udah beres — nggak ada yang menggantung ✅')
+        : 'Belum ada catatan hutang maupun piutang sama sekali di Duitku.',
+      blocks: [],
+      suggestions: ['Ringkas kondisi keuangan saya', 'Berapa saldo saya?'],
+    };
+  }
+
+  /* --- Ada isinya. --- */
+
+  const blocks: AnswerBlock[] = [];
+  if (totalPiutang > 0) {
+    blocks.push({ kind: 'stat', label: 'Dipegang orang lain', value: money(totalPiutang), sub: `${piutang.length} orang`, tone: 'in' });
+  }
+  if (totalHutang > 0) {
+    blocks.push({ kind: 'stat', label: 'Hutangmu', value: money(totalHutang), sub: `${hutang.length} catatan`, tone: 'out' });
+  }
+
+  // Daftar disesuaikan dengan arah pertanyaan.
+  const sorot = q.debtSide === 'mine' ? hutang : piutang;
+  const urut = [...sorot].sort((a, b) => debtAgeDays(b) - debtAgeDays(a)).slice(0, 5);
   if (urut.length > 0) {
     blocks.push({
       kind: 'list',
       items: urut.map((d) => ({
         icon: isOverdue(d) ? '⚠️' : '🕒',
         title: d.personName,
-        sub: `${humanizeDuration(debtAgeDays(d))}${isOverdue(d) ? ' · lewat jatuh tempo' : ''}`,
+        sub: `udah ${humanizeDuration(debtAgeDays(d))}${isOverdue(d) ? ' · lewat jatuh tempo' : ''}`,
         right: money(debtRemaining(d)),
         tone: isOverdue(d) ? 'warn' : 'neutral',
       })),
     });
   }
 
-  if (telat.length > 0) {
+  if (telat.length > 0 && q.debtSide !== 'mine') {
     blocks.push({
       kind: 'note',
       tone: 'danger',
-      title: `${telat.length} orang lewat jatuh tempo`,
-      text: `Total ${money(telat.reduce((s, d) => s + debtRemaining(d), 0))} sudah melewati tanggal janji. Buka tab Hutang untuk menagih lewat WhatsApp.`,
+      title: `${telat.length} orang udah lewat jatuh tempo`,
+      text: `Totalnya ${money(telat.reduce((s, d) => s + debtRemaining(d), 0))}. Buka tab Hutang kalau mau langsung ditagih lewat WhatsApp.`,
     });
   }
 
+  if (q.debtSide === 'mine') {
+    return {
+      text: pick(
+        `Kamu masih punya hutang ${money(totalHutang)} ke ${hutang.length} orang.`,
+        `Hutangmu yang belum lunas ${money(totalHutang)}, ke ${hutang.length} orang.`,
+      ),
+      blocks,
+      suggestions: ['Total piutang saya berapa?', 'Ringkas kondisi keuangan saya'],
+    };
+  }
+
   const posisi = totalPiutang - totalHutang;
+
+  // Kalau yang ditanya khusus piutang, jangan diselipi urusan hutang sendiri —
+  // itu bikin jawabannya panjang tanpa menjawab pertanyaannya.
+  const fokusPiutang = q.debtSide === 'theirs' || totalHutang === 0;
+
+  const inti = fokusPiutang
+    ? pick(
+        `Ada ${money(totalPiutang)} duitmu yang masih dipegang ${piutang.length} orang.`,
+        `${money(totalPiutang)} masih nyangkut di ${piutang.length} orang.`,
+      ) + (telat.length > 0 ? ` ${telat.length} di antaranya udah lewat jatuh tempo.` : '')
+    : `${money(totalPiutang)} masih dipegang ${piutang.length} orang, dan kamu sendiri punya hutang ${money(totalHutang)}. ` +
+      `Jadi posisimu ${posisi >= 0 ? 'plus' : 'minus'} ${money(Math.abs(posisi))}.`;
+
   return {
-    text:
-      `Ada ${money(totalPiutang)} uangmu yang masih dipegang ${piutang.length} orang, ` +
-      `dan kamu punya hutang ${money(totalHutang)}. Posisi bersihmu ${posisi >= 0 ? 'plus' : 'minus'} ${money(Math.abs(posisi))}.`,
+    text: inti,
     blocks,
     suggestions: ['Siapa yang paling lama belum bayar?', 'Ringkas kondisi keuangan saya'],
   };
@@ -380,16 +523,16 @@ function answerBudget(q: ParsedQuestion, ctx: Ctx): Answer {
 
   if (statuses.length === 0) {
     return {
-      text: 'Kamu belum memasang anggaran sama sekali. Kalau dipasang, saya bisa mengingatkan sebelum jebol.',
+      text: 'Kamu belum pasang anggaran sama sekali. Kalau dipasang, nanti aku bisa ingetin sebelum jebol.',
       blocks: [
         {
           kind: 'note',
           tone: 'warn',
           title: 'Belum ada anggaran',
-          text: 'Buka menu Anggaran, pasang batas total dulu. Patokan yang enak: sekitar 80% dari pemasukan bulananmu.',
+          text: 'Buka menu Anggaran, pasang batas totalnya dulu. Patokan gampang: sekitar 80% dari pemasukan bulananmu.',
         },
       ],
-      suggestions: ['Berapa pemasukan bulan ini?', 'Kategori apa yang paling boros?'],
+      suggestions: ['Berapa pemasukan bulan ini?', 'Yang paling boros apa?'],
     };
   }
 
@@ -414,27 +557,25 @@ function answerBudget(q: ParsedQuestion, ctx: Ctx): Answer {
       kind: 'note',
       tone: 'danger',
       title: `${jebol.length} anggaran jebol`,
-      text: jebol
-        .map((s) => `${s.category?.name ?? 'Total'} lewat ${money(Math.abs(s.remaining))}`)
-        .join(', ') + '.',
+      text: jebol.map((s) => `${s.category?.name ?? 'Total'} lewat ${money(Math.abs(s.remaining))}`).join(', ') + '.',
     });
   } else if (hampir.length > 0) {
     blocks.push({
       kind: 'note',
       tone: 'warn',
-      title: 'Mendekati batas',
-      text: hampir.map((s) => `${s.category?.name ?? 'Total'} sudah ${Math.round(s.percent)}%`).join(', ') + '. Rem dikit ya.',
+      title: 'Udah mepet',
+      text: hampir.map((s) => `${s.category?.name ?? 'Total'} udah ${Math.round(s.percent)}%`).join(', ') + '. Rem dikit ya 😅',
     });
   }
 
   const text =
     jebol.length > 0
-      ? `Ada ${jebol.length} anggaran yang sudah jebol bulan ini.`
+      ? pick(`Waduh, ada ${jebol.length} anggaran yang udah jebol bulan ini.`, `${jebol.length} anggaranmu kelewat batas nih bulan ini.`)
       : hampir.length > 0
-        ? `Anggaranmu masih aman, tapi ${hampir.length} kategori sudah mendekati batas.`
-        : 'Semua anggaranmu masih terkendali bulan ini. 👌';
+        ? `Masih aman, tapi ${hampir.length} kategori udah mepet batas.`
+        : pick('Anggaranmu aman semua bulan ini 👌', 'Semua masih terkendali, nggak ada yang jebol 👍');
 
-  return { text, blocks, suggestions: ['Kategori apa yang paling boros?', 'Ada saran biar lebih hemat?'] };
+  return { text, blocks, suggestions: ['Yang paling boros apa?', 'Ada saran biar lebih hemat?'] };
 }
 
 /* ------------------------------------------------------------------ */
@@ -467,36 +608,48 @@ function vitals(data: AppData, range: DateRange): Vitals {
 function answerOverview(q: ParsedQuestion, ctx: Ctx): Answer {
   const { data, money } = ctx;
   const v = vitals(data, q.period.range);
+
+  if (v.scoped.length === 0) {
+    return {
+      text: `Belum ada catatan apa pun ${q.period.label}. Masih kosong.`,
+      blocks: [],
+      suggestions: ['Coba bulan lalu', 'Berapa saldo saya?'],
+    };
+  }
+
   const saldo = totalBalance(data.wallets, data.transactions);
   const aktif = data.debts.filter((d) => d.status === 'active');
   const piutang = aktif.filter((d) => d.type === 'receivable').reduce((s, d) => s + debtRemaining(d), 0);
 
   const blocks: AnswerBlock[] = [
-    { kind: 'stat', label: `Pemasukan · ${q.period.label}`, value: money(v.income), tone: 'in' },
-    { kind: 'stat', label: `Pengeluaran · ${q.period.label}`, value: money(v.expense), tone: 'out' },
+    { kind: 'stat', label: `Masuk · ${q.period.label}`, value: money(v.income), tone: 'in' },
+    { kind: 'stat', label: `Keluar · ${q.period.label}`, value: money(v.expense), tone: 'out' },
     {
       kind: 'stat',
-      label: 'Selisih',
+      label: v.net >= 0 ? 'Sisa' : 'Nombok',
       value: `${v.net >= 0 ? '+' : '-'}${money(Math.abs(v.net))}`,
-      sub: v.income > 0 ? `rasio tabungan ${formatPercent(v.savingRate, 0)}` : undefined,
+      sub: v.income > 0 ? `nabung ${formatPercent(v.savingRate, 0)} dari pemasukan` : undefined,
       tone: v.net >= 0 ? 'in' : 'out',
     },
     {
       kind: 'list',
       items: [
         { icon: '👛', title: 'Saldo semua dompet', right: money(saldo) },
-        { icon: '🤝', title: 'Piutang belum tertagih', right: money(piutang), tone: piutang > 0 ? 'warn' : 'neutral' },
+        { icon: '🤝', title: 'Masih dipegang orang', right: money(piutang), tone: piutang > 0 ? 'warn' : 'neutral' },
         { icon: '🧾', title: 'Jumlah transaksi', right: `${v.scoped.length}` },
       ],
     },
   ];
 
+  const tutup =
+    v.net >= 0
+      ? pick(` Sisa ${money(v.net)} — lumayan 👍`, ` Masih sisa ${money(v.net)}, aman.`)
+      : pick(` Nombok ${money(Math.abs(v.net))} nih.`, ` Minus ${money(Math.abs(v.net))}, keluarnya lebih gede.`);
+
   return {
-    text:
-      `${q.period.label.charAt(0).toUpperCase() + q.period.label.slice(1)}: masuk ${money(v.income)}, ` +
-      `keluar ${money(v.expense)}, jadi ${v.net >= 0 ? 'sisa' : 'minus'} ${money(Math.abs(v.net))}.`,
+    text: `${kapital(q.period.label)} masuk ${money(v.income)}, keluar ${money(v.expense)}.${tutup}`,
     blocks,
-    suggestions: ['Ada saran biar lebih hemat?', 'Kategori apa yang paling boros?'],
+    suggestions: ['Ada saran biar lebih hemat?', 'Yang paling boros apa?'],
   };
 }
 
@@ -509,40 +662,43 @@ function answerAdvice(q: ParsedQuestion, ctx: Ctx): Answer {
 
   if (v.scoped.length === 0) {
     return {
-      text: 'Catatanmu pada periode ini masih kosong, jadi belum ada yang bisa saya analisis. Catat beberapa transaksi dulu ya.',
+      text: `Catatanmu ${q.period.label} masih kosong, jadi belum ada yang bisa aku lihat. Catat beberapa transaksi dulu ya, nanti aku bantu analisis.`,
       blocks: [],
-      suggestions: ['Berapa saldo saya?', 'Berapa total piutang saya?'],
+      suggestions: ['Berapa saldo saya?', 'Coba bulan lalu'],
     };
   }
 
-  // 1. Arus kas utama.
+  // 1. Arus kas — yang paling penting, taruh duluan.
   if (v.net < 0) {
-    poin.push(`Pengeluaranmu ${money(Math.abs(v.net))} lebih besar daripada pemasukan. Ini yang paling perlu dibereskan.`);
+    poin.push(pick(
+      `Yang paling perlu dibenerin: bulan ini kamu nombok ${money(Math.abs(v.net))}, keluarnya lebih gede dari masuknya.`,
+      `Pertama-tama, kamu lagi minus ${money(Math.abs(v.net))} — pengeluaran melebihi pemasukan.`,
+    ));
     blocks.push({
       kind: 'note',
       tone: 'danger',
       title: 'Besar pasak daripada tiang',
-      text: `Bulan ini kamu nombok ${money(Math.abs(v.net))}. Kalau berlanjut, tabungan akan tergerus.`,
+      text: `Bulan ini nombok ${money(Math.abs(v.net))}. Kalau kebiasaan, tabungan bakal kegerus pelan-pelan.`,
     });
   } else if (v.savingRate < 10 && v.income > 0) {
-    poin.push(`Rasio tabunganmu baru ${formatPercent(v.savingRate, 0)}. Idealnya minimal 20%.`);
+    poin.push(`Sisanya tipis banget — cuma ${formatPercent(v.savingRate, 0)} dari pemasukan. Idealnya minimal 20%.`);
     blocks.push({
       kind: 'note',
       tone: 'warn',
-      title: 'Sisa terlalu tipis',
-      text: `Dari ${money(v.income)} pemasukan, hanya ${money(v.net)} yang tersisa. Target 20% berarti menyisihkan ${money(v.income * 0.2)}.`,
+      title: 'Sisanya tipis',
+      text: `Dari ${money(v.income)} yang masuk, cuma ${money(v.net)} yang nyisa. Kalau mau 20%, berarti sisihin ${money(v.income * 0.2)}.`,
     });
   } else if (v.income > 0) {
-    poin.push(`Rasio tabunganmu ${formatPercent(v.savingRate, 0)} — sudah bagus, pertahankan.`);
+    poin.push(`Kabar bagusnya, kamu nabung ${formatPercent(v.savingRate, 0)} dari pemasukan. Itu udah bagus, pertahanin.`);
     blocks.push({
       kind: 'note',
       tone: 'ok',
-      title: 'Arus kas sehat',
-      text: `Kamu menyisakan ${money(v.net)} dari ${money(v.income)} pemasukan.`,
+      title: 'Aman nih',
+      text: `Dari ${money(v.income)} pemasukan, ${money(v.net)} berhasil kamu sisihkan.`,
     });
   }
 
-  // 2. Kategori terboros dan seberapa dominan.
+  // 2. Kategori paling dominan.
   const top = v.breakdown[0];
   if (top?.category) {
     blocks.push({
@@ -555,14 +711,14 @@ function answerAdvice(q: ParsedQuestion, ctx: Ctx): Answer {
         color: b.category?.color ?? '#94A3B8',
       })),
     });
-    if (top.percent > 40) {
-      poin.push(`${top.category.name} menyedot ${formatPercent(top.percent, 0)} pengeluaranmu — terlalu dominan, layak ditinjau.`);
-    } else {
-      poin.push(`Pengeluaran terbesarmu ${top.category.name} sebesar ${money(top.total)}.`);
-    }
+    poin.push(
+      top.percent > 40
+        ? `${top.category.name} makan ${formatPercent(top.percent, 0)} dari pengeluaranmu — agak dominan, coba dilihat lagi.`
+        : `Pengeluaran terbesarmu di ${top.category.name}, ${money(top.total)}.`,
+    );
   }
 
-  // 3. Kategori yang melonjak dibanding periode sebelumnya.
+  // 3. Kategori yang melonjak.
   if (q.period.previous) {
     const before = breakdownByCategory(txIn(data, q.period.previous.range), data.categories, 'expense');
     const lonjakan = v.breakdown
@@ -575,7 +731,7 @@ function answerAdvice(q: ParsedQuestion, ctx: Ctx): Answer {
       .slice(0, 3);
 
     if (lonjakan.length > 0) {
-      poin.push(`${lonjakan[0].name} naik ${formatPercent((lonjakan[0].diff / lonjakan[0].was) * 100, 0)} dibanding ${q.period.previous.label}.`);
+      poin.push(`${lonjakan[0].name} lompat ${formatPercent((lonjakan[0].diff / lonjakan[0].was) * 100, 0)} dibanding ${q.period.previous.label}.`);
       blocks.push({
         kind: 'list',
         items: lonjakan.map((m) => ({
@@ -589,30 +745,28 @@ function answerAdvice(q: ParsedQuestion, ctx: Ctx): Answer {
     }
   }
 
-  // 4. Transaksi kecil yang sering — sering luput dari perhatian.
+  // 4. Receh yang menumpuk.
   const kecil = v.scoped.filter((t) => t.type === 'expense' && t.amount <= 50_000);
   if (kecil.length >= 8) {
-    const totalKecil = kecil.reduce((s, t) => s + t.amount, 0);
-    poin.push(`Ada ${kecil.length} transaksi kecil yang totalnya ${money(totalKecil)} — receh yang menumpuk.`);
+    poin.push(`Ada ${kecil.length} transaksi kecil yang kalau dijumlah jadi ${money(kecil.reduce((s, t) => s + t.amount, 0))}. Receh tapi numpuk.`);
   }
 
-  // 5. Anggaran yang jebol.
+  // 5. Anggaran jebol.
   const jebol = budgetStatuses(data, monthKey(q.period.range.to)).filter((s) => s.over);
   if (jebol.length > 0) {
-    poin.push(`${jebol.length} anggaran sudah jebol: ${jebol.map((s) => s.category?.name ?? 'Total').join(', ')}.`);
+    poin.push(`Oh iya, ${jebol.length} anggaran udah jebol: ${jebol.map((s) => s.category?.name ?? 'Total').join(', ')}.`);
   }
 
-  // 6. Piutang menganggur.
+  // 6. Piutang mengendap.
   const macet = data.debts.filter((d) => d.type === 'receivable' && d.status === 'active' && debtAgeDays(d) > 30);
   if (macet.length > 0) {
-    const nilai = macet.reduce((s, d) => s + debtRemaining(d), 0);
-    poin.push(`${money(nilai)} uangmu tertahan di ${macet.length} orang lebih dari sebulan. Itu uang nganggur.`);
+    poin.push(`Terakhir, ${money(macet.reduce((s, d) => s + debtRemaining(d), 0))} nyangkut di ${macet.length} orang lebih dari sebulan. Sayang, itu uang nganggur.`);
   }
 
   return {
     text: poin.join(' '),
     blocks,
-    suggestions: ['Kategori apa yang paling boros?', 'Bagaimana anggaran saya?', 'Berapa total piutang saya?'],
+    suggestions: ['Yang paling boros apa?', 'Gimana anggaran saya?', 'Total piutang saya berapa?'],
   };
 }
 
@@ -622,25 +776,25 @@ function answerAdvice(q: ParsedQuestion, ctx: Ctx): Answer {
 
 const CONTOH = [
   'Berapa pengeluaran bensin bulan ini?',
-  'Kategori apa yang paling boros?',
-  'Bandingkan pengeluaran bulan ini dengan bulan lalu',
+  'Yang paling boros apa?',
+  'Bandingkan dengan bulan lalu',
   'Ada saran biar lebih hemat?',
-  'Berapa total piutang saya?',
-  'Bagaimana anggaran saya?',
+  'Total piutang saya berapa?',
+  'Gimana anggaran saya?',
 ];
 
 function answerHelp(name: string): Answer {
   return {
     text:
-      `Halo ${name}! Saya bisa membaca seluruh catatan keuanganmu dan menjawab langsung, ` +
-      'jadi kamu tidak perlu scroll dan menghitung sendiri. Coba tanya seperti ini:',
+      `Halo ${name}! Aku bisa baca semua catatan keuanganmu, jadi kamu nggak perlu scroll-scroll ` +
+      'dan ngitung sendiri. Tanya aja pakai bahasa biasa, contohnya:',
     blocks: [
       {
         kind: 'list',
         items: [
-          { icon: '🔍', title: 'Tanya angka', sub: '"Berapa pengeluaran bensin bulan ini?"' },
-          { icon: '📊', title: 'Cari yang boros', sub: '"Kategori apa yang paling boros?"' },
-          { icon: '⚖️', title: 'Bandingkan waktu', sub: '"Bandingkan dengan bulan lalu"' },
+          { icon: '🔍', title: 'Nanya angka', sub: '"Berapa pengeluaran bensin bulan ini?"' },
+          { icon: '📊', title: 'Cari yang boros', sub: '"Yang paling boros apa?"' },
+          { icon: '⚖️', title: 'Bandingin waktu', sub: '"Bandingkan dengan bulan lalu"' },
           { icon: '💡', title: 'Minta saran', sub: '"Ada saran biar lebih hemat?"' },
           { icon: '🤝', title: 'Cek hutang', sub: '"Siapa yang belum bayar?"' },
         ],
@@ -648,8 +802,8 @@ function answerHelp(name: string): Answer {
       {
         kind: 'note',
         tone: 'ok',
-        title: 'Semua diproses di HP-mu',
-        text: 'Tidak ada satu pun data keuanganmu yang dikirim ke internet. Analisisnya berjalan langsung di perangkat, jadi tetap bisa dipakai walau sedang offline.',
+        title: 'Semua diproses di HP kamu',
+        text: 'Nggak ada data keuanganmu yang dikirim ke internet. Semuanya dihitung langsung di perangkat, jadi tetap jalan walau lagi offline.',
       },
     ],
     suggestions: CONTOH.slice(0, 4),
@@ -657,11 +811,10 @@ function answerHelp(name: string): Answer {
 }
 
 function answerUnknown(q: ParsedQuestion, ctx: Ctx): Answer {
-  // Daripada menyerah, berikan ringkasan periode yang ditanyakan.
   const fallback = answerOverview(q, ctx);
   return {
     ...fallback,
-    text: `Saya belum paham persis maksudnya, jadi saya tampilkan ringkasan ${q.period.label} dulu. ${fallback.text}`,
+    text: `Hmm, aku kurang nangkep maksudnya 😅 Tapi ini ringkasan ${q.period.label}, siapa tahu yang kamu cari. ${fallback.text}`,
     suggestions: CONTOH.slice(0, 4),
   };
 }
