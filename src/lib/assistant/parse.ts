@@ -22,13 +22,94 @@ import type { Intent, ParsedPeriod, ParsedQuestion } from './types';
  * data keuangan pengguna meninggalkan perangkat.
  */
 
-/** Membuang tanda baca dan merapikan spasi agar pencocokan lebih longgar. */
+/**
+ * Singkatan dan bahasa percakapan yang lazim dipakai orang saat mengetik cepat.
+ * Dipetakan ke bentuk baku supaya sisa penafsir tidak perlu tahu ragam ini.
+ */
+const GAUL: Record<string, string> = {
+  gw: 'saya', gue: 'saya', gua: 'saya', aku: 'saya', ane: 'saya', sy: 'saya',
+  brp: 'berapa', brapa: 'berapa', bpr: 'berapa',
+  bln: 'bulan', thn: 'tahun', mgg: 'minggu',
+  yg: 'yang', dg: 'dengan', dgn: 'dengan', sm: 'sama', utk: 'untuk', buat: 'untuk',
+  gmn: 'gimana', gmna: 'gimana', gimna: 'gimana', bgmn: 'bagaimana',
+  aja: 'saja', doang: 'saja', dong: '', sih: '', deh: '', nih: '', kok: '',
+  udh: 'sudah', udah: 'sudah', dah: 'sudah',
+  gak: 'tidak', ga: 'tidak', nggak: 'tidak', ngga: 'tidak', kaga: 'tidak', enggak: 'tidak',
+  duit: 'uang', cuan: 'uang', fulus: 'uang',
+  bandingin: 'bandingkan', bandingi: 'bandingkan',
+  ngutang: 'hutang', ngutangin: 'hutang', utangin: 'hutang',
+  abis: 'habis', ngabisin: 'habis',
+  gede: 'besar', gedhe: 'besar',
+  brg: 'barang', tf: 'transfer',
+  bbrp: 'beberapa', sblm: 'sebelum',
+};
+
+/**
+ * Kata penting yang sering salah ketik. Dipakai sebagai kamus pembanding untuk
+ * mengoreksi ejaan, supaya "pengeluran" atau "booros" tetap dipahami.
+ */
+const KAMUS = [
+  'pengeluaran', 'pemasukan', 'penghasilan', 'pendapatan', 'berapa', 'saldo', 'boros',
+  'kategori', 'transaksi', 'hutang', 'piutang', 'anggaran', 'bandingkan', 'dibanding',
+  'bulan', 'minggu', 'tahun', 'kemarin', 'terakhir', 'terbesar', 'paling', 'rata',
+  'bensin', 'makan', 'belanja', 'tagihan', 'hiburan', 'kesehatan', 'transportasi',
+  'keuangan', 'ringkasan', 'laporan', 'dompet', 'tabungan', 'sisa', 'total', 'jumlah',
+  'saran', 'hemat', 'jajan', 'gaji', 'bayar', 'lunas', 'sering', 'kapan', 'siapa',
+];
+
+/** Jarak ubah antar dua kata, dipakai untuk menoleransi salah ketik ringan. */
+function editDistance(a: string, b: string): number {
+  if (Math.abs(a.length - b.length) > 2) return 99;
+  const prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let diag = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const simpan = prev[j];
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diag = simpan;
+    }
+  }
+  return prev[b.length];
+}
+
+/** Mengembalikan bentuk baku sebuah kata: singkatan dibuka, ejaan dirapikan. */
+function bakukan(kata: string): string {
+  if (kata in GAUL) return GAUL[kata];
+
+  // Huruf berulang seperti "booros" atau "saldoo" dirapatkan lebih dulu.
+  const rapat = kata.replace(/([a-z])\1{1,}/g, '$1');
+  if (KAMUS.includes(rapat)) return rapat;
+  if (KAMUS.includes(kata)) return kata;
+
+  // Koreksi ejaan hanya untuk kata yang cukup panjang, agar kata pendek
+  // seperti "ada" tidak berubah jadi "apa".
+  if (kata.length >= 5) {
+    const batas = kata.length >= 8 ? 2 : 1;
+    let terbaik: { kata: string; jarak: number } | undefined;
+    for (const benar of KAMUS) {
+      const jarak = editDistance(kata, benar);
+      if (jarak <= batas && (!terbaik || jarak < terbaik.jarak)) terbaik = { kata: benar, jarak };
+    }
+    if (terbaik) return terbaik.kata;
+  }
+  return kata;
+}
+
+/**
+ * Membuang tanda baca, membakukan singkatan, dan mengoreksi salah ketik ringan
+ * supaya pencocokan kata kunci tidak gampang meleset.
+ */
 export function normalize(text: string): string {
   return text
     .toLowerCase()
     .replace(/[^\w\sÀ-ɏ]/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    .split(' ')
+    .map(bakukan)
+    .filter(Boolean)
+    .join(' ');
 }
 
 function escapeRe(s: string): string {
@@ -176,6 +257,16 @@ export function parsePeriod(text: string, transactions: AppData['transactions'])
     };
   }
 
+  // Nama bulan diperiksa sebelum kata "kemarin" yang berdiri sendiri, supaya
+  // "Agustus kemarin" dibaca sebagai bulan Agustus, bukan hari kemarin.
+  for (let i = 0; i < MONTH_NAMES.length; i++) {
+    const name = MONTH_NAMES[i].toLowerCase();
+    if (!hasWord(text, name)) continue;
+    const yearMatch = text.match(/(20\d{2})/);
+    const year = yearMatch ? Number(yearMatch[1]) : new Date().getFullYear();
+    return monthPeriod(`${year}-${String(i + 1).padStart(2, '0')}`);
+  }
+
   if (has(text, 'kemarin')) {
     const kemarin = shiftDays(today, -1);
     const lusa = shiftDays(today, -2);
@@ -200,15 +291,6 @@ export function parsePeriod(text: string, transactions: AppData['transactions'])
   if (lastMonths) {
     const n = Math.min(24, Math.max(2, Number(lastMonths[1])));
     return lastMonthsPeriod(n);
-  }
-
-  // Nama bulan, boleh disertai tahun: "juli", "agustus 2026"
-  for (let i = 0; i < MONTH_NAMES.length; i++) {
-    const name = MONTH_NAMES[i].toLowerCase();
-    if (!hasWord(text, name)) continue;
-    const yearMatch = text.match(/(20\d{2})/);
-    const year = yearMatch ? Number(yearMatch[1]) : new Date().getFullYear();
-    return monthPeriod(`${year}-${String(i + 1).padStart(2, '0')}`);
   }
 
   // Tidak disebut sama sekali: pakai bulan berjalan.
@@ -268,10 +350,55 @@ export function matchCategory(text: string, categories: Category[]): Category | 
 }
 
 /* ------------------------------------------------------------------ */
+/* Dompet                                                              */
+/* ------------------------------------------------------------------ */
+
+/** Nama bank dan dompet digital yang lazim disebut orang. */
+const HINT_DOMPET: Record<string, string[]> = {
+  bank: ['bank', 'rekening', 'bca', 'mandiri', 'bri', 'bni', 'atm', 'tabungan'],
+  ewallet: ['wallet', 'ewallet', 'gopay', 'ovo', 'dana', 'shopeepay', 'linkaja', 'digital'],
+  tunai: ['tunai', 'cash', 'dompet fisik', 'uang tunai'],
+};
+
+/** Mencari dompet yang dimaksud pertanyaan. */
+export function matchWallet(text: string, wallets: AppData['wallets']) {
+  // Nama dompet yang benar-benar dimiliki pengguna diutamakan.
+  const byName = wallets
+    .filter((w) => {
+      const words = normalize(w.name).split(' ').filter((x) => x.length > 3);
+      return words.length > 0 && words.every((x) => hasWord(text, x));
+    })
+    .sort((a, b) => b.name.length - a.name.length);
+  if (byName[0]) return byName[0];
+
+  for (const [kunci, kata] of Object.entries(HINT_DOMPET)) {
+    if (!kata.some((k) => hasWord(text, k))) continue;
+    const cocok = wallets.find((w) => {
+      const n = normalize(w.name);
+      if (kunci === 'bank') return n.includes('bank') || n.includes('rekening');
+      if (kunci === 'ewallet') return n.includes('wallet') || n.includes('digital');
+      return n.includes('tunai') || n.includes('cash');
+    });
+    if (cocok) return cocok;
+  }
+  return undefined;
+}
+
+/* ------------------------------------------------------------------ */
 /* Maksud pertanyaan                                                   */
 /* ------------------------------------------------------------------ */
 
-function detectIntent(text: string, hasCategory: boolean): Intent {
+/**
+ * Menentukan maksud pertanyaan.
+ *
+ * Urutannya penting: yang lebih khusus diperiksa lebih dulu, supaya
+ * "berapa kali saya jajan" tidak tertangkap sebagai pertanyaan nominal
+ * hanya karena mengandung kata "berapa".
+ */
+function detectIntent(
+  text: string,
+  ada: { kategori: boolean; dompet: boolean; orang: boolean },
+): Intent {
   if (!text) return 'unknown';
 
   if (has(text, 'halo', 'hai', 'hei', 'assalamu', 'pagi', 'siang', 'sore', 'malam') && text.length < 24) {
@@ -279,24 +406,95 @@ function detectIntent(text: string, hasCategory: boolean): Intent {
   }
   if (has(text, 'bisa apa', 'apa saja', 'bantuan', 'help', 'cara pakai', 'kamu bisa')) return 'help';
 
-  if (has(text, 'saran', 'sarannya', 'tips', 'nasihat', 'nasehat', 'rekomendasi', 'gimana caranya', 'bagaimana caranya', 'harus gimana', 'hemat', 'menghemat', 'berhemat', 'evaluasi', 'analisis', 'analisa', 'sehat', 'kondisi keuangan', 'boros nggak', 'boros ga', 'menurut kamu')) {
+  // Pertanyaan waktu: "kapan terakhir aku isi bensin"
+  if (has(text, 'kapan', 'tanggal berapa')) return 'when';
+
+  // Menghitung banyaknya, bukan nominalnya.
+  if (
+    has(text, 'berapa kali', 'berapa sering', 'seberapa sering', 'berapa banyak transaksi', 'berapa transaksi') ||
+    /\bada berapa\b/.test(text) ||
+    (has(text, 'jumlah', 'banyaknya') && has(text, 'transaksi'))
+  ) {
+    return 'count';
+  }
+
+  if (has(text, 'rata rata', 'rata-rata', 'rerata', 'per hari', 'sehari')) return 'average';
+
+  if (
+    has(
+      text, 'saran', 'sarannya', 'tips', 'nasihat', 'nasehat', 'rekomendasi', 'gimana caranya',
+      'bagaimana caranya', 'harus gimana', 'hemat', 'menghemat', 'berhemat', 'evaluasi',
+      'analisis', 'analisa', 'sehat', 'kondisi keuangan', 'keuangan saya', 'gimana keuangan',
+      'bagaimana keuangan', 'keuanganku', 'boros tidak', 'boros nggak', 'menurut kamu',
+    )
+  ) {
     return 'advice';
   }
-  // Pencocokan memakai batas kata, jadi imbuhan harus disebut satu per satu.
-  if (has(text, 'banding', 'bandingkan', 'dibanding', 'dibandingkan', 'perbandingan', 'vs', 'versus', 'selisih', 'naik atau turun', 'lebih besar', 'lebih boros')) {
+
+  if (
+    has(
+      text, 'banding', 'bandingkan', 'dibanding', 'dibandingkan', 'perbandingan', 'vs', 'versus',
+      'selisih', 'naik atau turun', 'lebih besar', 'lebih boros', 'lebih hemat',
+    )
+  ) {
     return 'compare';
   }
-  if (has(text, 'paling boros', 'paling besar', 'terboros', 'terbesar', 'boros', 'top', 'peringkat', 'ranking', 'paling sering', 'urutan', 'kemana perginya', 'ke mana perginya', 'rincian', 'rinciannya', 'breakdown')) {
+
+  // Satu transaksi terbesar berbeda dengan peringkat kategori. Penyebutan
+  // "kategori" jadi penentu: tanpa itu, orang menanyakan satu transaksi.
+  const nadaTerbesar = has(text, 'terbesar', 'paling besar', 'paling mahal', 'paling banyak', 'terbanyak');
+  if (nadaTerbesar && has(text, 'transaksi', 'pengeluaran', 'belanja', 'catatan') && !has(text, 'kategori')) {
+    return 'largest';
+  }
+
+  if (
+    has(
+      text, 'paling boros', 'terboros', 'boros', 'kategori', 'peringkat', 'ranking', 'urutan',
+      'paling sering', 'kemana perginya', 'ke mana perginya', 'rincian', 'rinciannya', 'breakdown',
+    ) ||
+    nadaTerbesar
+  ) {
     return 'ranking';
   }
-  if (has(text, 'hutang', 'hutangnya', 'berhutang', 'utang', 'piutang', 'piutangnya', 'pinjam', 'pinjaman', 'meminjam', 'nagih', 'menagih', 'ditagih', 'penagihan', 'belum bayar', 'jatuh tempo')) {
+
+  // Pertanyaan tentang orang tertentu yang berhutang.
+  if (ada.orang && has(text, 'bayar', 'lunas', 'hutang', 'utang', 'piutang', 'sisa', 'berapa', 'belum')) {
     return 'debt';
   }
-  if (has(text, 'anggaran', 'anggarannya', 'budget', 'jebol', 'batas belanja', 'sisa anggaran')) return 'budget';
-  if (has(text, 'saldo', 'sisa uang', 'uang saya', 'punya uang', 'dompet')) return 'balance';
-  if (has(text, 'ringkas', 'ringkasan', 'ringkaskan', 'rangkum', 'rangkuman', 'laporan', 'overview', 'kondisi', 'gambaran')) return 'overview';
 
-  if (has(text, 'berapa', 'total', 'jumlah', 'habis', 'keluar', 'masuk', 'pengeluaran', 'pemasukan', 'belanja', 'dapat', 'income') || hasCategory) {
+  if (
+    has(
+      text, 'hutang', 'hutangnya', 'berhutang', 'utang', 'piutang', 'piutangnya', 'pinjam',
+      'pinjaman', 'meminjam', 'nagih', 'menagih', 'ditagih', 'penagihan', 'belum bayar',
+      'sudah bayar', 'jatuh tempo', 'tunggakan',
+    )
+  ) {
+    return 'debt';
+  }
+
+  if (has(text, 'anggaran', 'anggarannya', 'budget', 'jebol', 'batas belanja', 'sisa anggaran')) return 'budget';
+
+  // Dompet tertentu diperiksa sebelum saldo keseluruhan.
+  if (ada.dompet && has(text, 'saldo', 'uang', 'isi', 'berapa', 'sisa')) return 'wallet';
+
+  // "Total uang masuk" menanyakan pemasukan, bukan saldo. Karena itu penyebutan
+  // arah kas apa pun membatalkan penafsiran sebagai pertanyaan saldo.
+  const nadaArusKas = has(
+    text, 'habis', 'keluar', 'pengeluaran', 'belanja', 'boros', 'jajan',
+    'masuk', 'pemasukan', 'penghasilan', 'pendapatan', 'gaji',
+  );
+  if (has(text, 'saldo', 'sisa uang', 'uang saya', 'punya uang', 'dompet', 'total uang') && !nadaArusKas) {
+    return 'balance';
+  }
+
+  if (has(text, 'ringkas', 'ringkasan', 'ringkaskan', 'rangkum', 'rangkuman', 'laporan', 'overview', 'kondisi', 'gambaran')) {
+    return 'overview';
+  }
+
+  if (
+    has(text, 'berapa', 'total', 'jumlah', 'habis', 'keluar', 'masuk', 'pengeluaran', 'pemasukan', 'belanja', 'dapat', 'income') ||
+    ada.kategori
+  ) {
     return 'metric';
   }
   return 'unknown';
@@ -306,34 +504,38 @@ function detectIntent(text: string, hasCategory: boolean): Intent {
 export function parseQuestion(raw: string, data: AppData): ParsedQuestion {
   const text = normalize(raw);
   const category = matchCategory(text, data.categories);
+  const wallet = matchWallet(text, data.wallets);
   const period = parsePeriod(text, data.transactions);
 
-  const incomeWords = has(text, 'pemasukan', 'penghasilan', 'pendapatan', 'gaji', 'income', 'uang masuk', 'dapat duit', 'terima');
-  const expenseWords = has(text, 'pengeluaran', 'keluar', 'habis', 'belanja', 'boros', 'spending', 'uang keluar', 'jajan');
+  // Nama orang dicocokkan lebih dulu, karena "Budi sudah bayar belum"
+  // hanya bisa dikenali sebagai pertanyaan hutang lewat namanya.
+  const orang = data.debts.find((d) => {
+    const depan = normalize(d.personName).split(' ')[0];
+    return depan.length > 2 && hasWord(text, depan);
+  });
 
-  // Kategori pemasukan otomatis mengarahkan pertanyaan ke arus masuk.
+  const incomeWords = has(text, 'pemasukan', 'penghasilan', 'pendapatan', 'gaji', 'income', 'uang masuk', 'terima');
+  const expenseWords = has(text, 'pengeluaran', 'keluar', 'habis', 'belanja', 'boros', 'jajan', 'uang keluar');
+
   const flow: 'expense' | 'income' =
     incomeWords || (category?.type === 'income' && !expenseWords) ? 'income' : 'expense';
 
-  const intent = detectIntent(text, Boolean(category));
+  const intent = detectIntent(text, {
+    kategori: Boolean(category),
+    dompet: Boolean(wallet),
+    orang: Boolean(orang),
+  });
 
-  /*
-   * Arah pertanyaan hutang. "Apakah saya punya hutang" menanyakan kewajiban
-   * pengguna sendiri, sedangkan "siapa yang belum bayar" menanyakan uang yang
-   * dipegang orang lain. Dua-duanya sebelumnya dijawab sama, dan itu keliru.
-   */
   const tanyaMilikOrang = has(
-    text, 'piutang', 'piutangnya', 'hutang ke saya', 'utang ke saya', 'ngutang ke saya',
-    'hutang ke aku', 'utang ke aku', 'yang hutang', 'yang ngutang', 'yang belum bayar',
-    'siapa yang', 'nagih', 'menagih', 'ditagih', 'penagihan', 'tertagih', 'dipinjam',
+    text, 'piutang', 'piutangnya', 'hutang ke saya', 'utang ke saya', 'hutang ke aku',
+    'yang hutang', 'yang belum bayar', 'siapa yang', 'nagih', 'menagih', 'ditagih',
+    'penagihan', 'tertagih', 'dipinjam',
   );
   const tanyaMilikSaya = has(
-    text, 'hutang saya', 'utang saya', 'hutangku', 'utangku', 'hutang aku', 'utang aku',
+    text, 'hutang saya', 'utang saya', 'hutangku', 'utangku',
     'saya punya hutang', 'saya punya utang', 'saya ada hutang', 'saya ada utang',
-    'aku punya hutang', 'aku ada hutang', 'saya berhutang', 'aku berhutang',
-    'saya ngutang', 'aku ngutang', 'hutang saya ke', 'saya harus bayar',
+    'saya berhutang', 'saya hutang', 'saya harus bayar',
   );
-  // "hutang piutang" adalah satu ungkapan yang berarti dua-duanya sekaligus.
   const tanyaKeduanya = has(text, 'hutang piutang', 'utang piutang', 'piutang hutang', 'hutang dan piutang');
 
   const debtSide: 'mine' | 'theirs' | 'both' =
@@ -345,25 +547,17 @@ export function parseQuestion(raw: string, data: AppData): ParsedQuestion {
           ? 'mine'
           : 'both';
 
-  // Nama orang pada pertanyaan hutang: cocokkan dengan daftar yang ada.
-  let personName: string | undefined;
-  if (intent === 'debt') {
-    const found = data.debts.find((d) => {
-      const first = normalize(d.personName).split(' ')[0];
-      return first.length > 2 && text.includes(first);
-    });
-    personName = found?.personName;
-  }
-
   return {
     intent,
     normalized: text,
     period,
     categoryId: category?.id,
     categoryName: category?.name,
+    walletId: wallet?.id,
+    walletName: wallet?.name,
     flow,
     flowExplicit: incomeWords || expenseWords,
-    personName,
+    personName: orang?.personName,
     debtSide,
   };
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { ask, greeting, type AnswerBlock, type ChatMessage } from '../lib/assistant';
 import { uid } from '../lib/id';
-import { IconClose, IconSearch } from './Icons';
+import { IconClose } from './Icons';
 
 /** Ikon kilau untuk tombol asisten. */
 function IconSpark({ size = 24 }: { size?: number }) {
@@ -23,9 +23,9 @@ function IconSend({ size = 20 }: { size?: number }) {
   );
 }
 
-function IconArrowRight({ size = 16 }: { size?: number }) {
+function IconArrowRight({ size = 16, className }: { size?: number; className?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 12h13M13 6l6 6-6 6" />
     </svg>
   );
@@ -242,12 +242,16 @@ export default function AiChat() {
             </div>
 
             {saran.length > 0 && (
-              <div className="ai-suggest">
-                {saran.map((s) => (
-                  <button key={s} onClick={() => kirim(s)}>
-                    <IconSearch size={12} /> {s}
-                  </button>
-                ))}
+              <div className="ai-suggest-wrap">
+                <div className="ai-suggest-label">Ketuk untuk bertanya</div>
+                <div className="ai-suggest">
+                  {saran.map((s) => (
+                    <button key={s} type="button" onClick={() => kirim(s)}>
+                      {s}
+                      <IconArrowRight size={14} className="arrow" />
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

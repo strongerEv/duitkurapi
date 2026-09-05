@@ -10,7 +10,7 @@ import {
   totalByType,
   walletBalance,
 } from '../calc';
-import { formatDate, formatRange, humanizeDuration, monthKey, rangeLengthDays, type DateRange } from '../date';
+import { daysBetween, formatDate, formatRange, humanizeDuration, monthKey, todayISO, type DateRange } from '../date';
 import { formatMoney, formatPercent } from '../format';
 import type { Answer, AnswerBlock, ParsedPeriod, ParsedQuestion } from './types';
 
@@ -34,6 +34,20 @@ function makeCtx(data: AppData): Ctx {
 }
 
 const txIn = (data: AppData, range: DateRange) => filterByRange(data.transactions, range.from, range.to);
+
+/**
+ * Jumlah hari yang benar-benar sudah berjalan pada sebuah rentang.
+ *
+ * Untuk periode yang belum selesai — misalnya bulan berjalan yang baru masuk
+ * tanggal 5 — membagi dengan 30 hari penuh membuat rata-rata harian terlihat
+ * jauh lebih kecil daripada kenyataannya.
+ */
+function hariBerjalan(range: DateRange): number {
+  const hariIni = todayISO();
+  const akhir = range.to > hariIni ? hariIni : range.to;
+  if (akhir < range.from) return 1;
+  return Math.max(1, daysBetween(range.from, akhir) + 1);
+}
 
 /** Memilih satu dari beberapa variasi kalimat, biar tidak terdengar seperti robot. */
 function pick(...opts: string[]): string {
@@ -144,7 +158,7 @@ function answerMetric(q: ParsedQuestion, ctx: Ctx): Answer {
     }),
   });
 
-  const days = rangeLengthDays(q.period.range);
+  const days = hariBerjalan(q.period.range);
   const rata = days > 2 ? ` Kalau dirata-rata sekitar ${money(total / days)} sehari.` : '';
 
   const inti = q.categoryName
@@ -770,6 +784,234 @@ function answerAdvice(q: ParsedQuestion, ctx: Ctx): Answer {
   };
 }
 
+
+/* ------------------------------------------------------------------ */
+/* Transaksi terbesar                                                  */
+/* ------------------------------------------------------------------ */
+
+function answerLargest(q: ParsedQuestion, ctx: Ctx): Answer {
+  const { data, money } = ctx;
+  const scoped = txIn(data, q.period.range).filter(
+    (t) => t.type === q.flow && (q.categoryId ? t.categoryId === q.categoryId : true),
+  );
+
+  if (scoped.length === 0) {
+    return {
+      text: `Nggak ada transaksi ${q.period.label}, jadi belum ada yang bisa diadu.`,
+      blocks: [],
+      suggestions: ['Coba bulan lalu', 'Berapa saldo saya?'],
+    };
+  }
+
+  const urut = [...scoped].sort((a, b) => b.amount - a.amount);
+  const juara = urut[0];
+  const cat = data.categories.find((c) => c.id === juara.categoryId);
+  const wal = data.wallets.find((w) => w.id === juara.walletId);
+  const porsi = (juara.amount / scoped.reduce((s, t) => s + t.amount, 0)) * 100;
+
+  return {
+    text: pick(
+      `Yang paling gede ${q.period.label}: ${juara.note?.trim() || cat?.name || 'transaksi'} — ${money(juara.amount)} pada ${formatDate(juara.date)}.`,
+      `Juaranya ${money(juara.amount)} buat ${juara.note?.trim() || cat?.name || 'transaksi'}, tanggal ${formatDate(juara.date)}.`,
+    ) + (porsi > 30 ? ` Itu ${formatPercent(porsi, 0)} dari total lho.` : ''),
+    blocks: [
+      {
+        kind: 'stat',
+        label: juara.note?.trim() || cat?.name || 'Transaksi terbesar',
+        value: money(juara.amount),
+        sub: `${cat?.name ?? ''} · ${wal?.name ?? ''} · ${formatDate(juara.date)}`,
+        tone: q.flow === 'income' ? 'in' : 'out',
+      },
+      {
+        kind: 'list',
+        items: urut.slice(1, 6).map((t) => {
+          const c = data.categories.find((x) => x.id === t.categoryId);
+          return {
+            icon: c?.icon,
+            title: t.note?.trim() || c?.name || 'Transaksi',
+            sub: formatDate(t.date),
+            right: money(t.amount),
+            tone: q.flow === 'income' ? 'in' : 'out',
+          };
+        }),
+      },
+    ],
+    suggestions: ['Yang paling boros apa?', 'Ringkas keuangan saya'],
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Berapa kali                                                         */
+/* ------------------------------------------------------------------ */
+
+function answerCount(q: ParsedQuestion, ctx: Ctx): Answer {
+  const { data, money } = ctx;
+  const semua = txIn(data, q.period.range);
+  const scoped = q.categoryId
+    ? semua.filter((t) => t.categoryId === q.categoryId)
+    : semua.filter((t) => (q.flowExplicit ? t.type === q.flow : true));
+
+  const total = scoped.reduce((s, t) => s + t.amount, 0);
+  const hari = hariBerjalan(q.period.range);
+  const apa = q.categoryName ?? (q.flowExplicit ? (q.flow === 'income' ? 'pemasukan' : 'pengeluaran') : 'transaksi');
+
+  if (scoped.length === 0) {
+    return {
+      text: `Nol — nggak ada catatan ${apa} ${q.period.label}.`,
+      blocks: [],
+      suggestions: ['Coba bulan lalu', 'Yang paling boros apa?'],
+    };
+  }
+
+  const seringnya =
+    hari >= 7 ? ` Kira-kira ${(scoped.length / (hari / 7)).toFixed(1).replace('.', ',')} kali seminggu.` : '';
+
+  return {
+    text: pick(
+      `${scoped.length} kali ${q.period.label}, totalnya ${money(total)}.${seringnya}`,
+      `Kamu ${apa === 'transaksi' ? 'mencatat' : 'jajan'} ${scoped.length} kali ${q.period.label} — ${money(total)}.${seringnya}`,
+    ),
+    blocks: [
+      { kind: 'stat', label: `Jumlah ${apa} · ${q.period.label}`, value: `${scoped.length} kali`, sub: `total ${money(total)}` },
+      {
+        kind: 'list',
+        items: [...scoped]
+          .sort((a, b) => b.date.localeCompare(a.date))
+          .slice(0, 5)
+          .map((t) => {
+            const c = data.categories.find((x) => x.id === t.categoryId);
+            return { icon: c?.icon, title: t.note?.trim() || c?.name || 'Transaksi', sub: formatDate(t.date), right: money(t.amount) };
+          }),
+      },
+    ],
+    suggestions: [q.categoryName ? `${kapital(q.categoryName)} bulan lalu berapa?` : 'Yang paling boros apa?', 'Rata-rata pengeluaran harian berapa?'],
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Rata-rata                                                           */
+/* ------------------------------------------------------------------ */
+
+function answerAverage(q: ParsedQuestion, ctx: Ctx): Answer {
+  const { data, money } = ctx;
+  const scoped = txIn(data, q.period.range).filter(
+    (t) => t.type === q.flow && (q.categoryId ? t.categoryId === q.categoryId : true),
+  );
+
+  if (scoped.length === 0) {
+    return {
+      text: `Belum ada catatan ${q.period.label}, jadi belum bisa dihitung rata-ratanya.`,
+      blocks: [],
+      suggestions: ['Coba bulan lalu', 'Berapa saldo saya?'],
+    };
+  }
+
+  const total = scoped.reduce((s, t) => s + t.amount, 0);
+  const hari = hariBerjalan(q.period.range);
+  const perHari = total / hari;
+  const perTransaksi = total / scoped.length;
+  const apa = q.categoryName ?? (q.flow === 'income' ? 'pemasukan' : 'pengeluaran');
+
+  return {
+    text: `Rata-rata ${apa}mu ${money(perHari)} sehari ${q.period.label}. Sekali transaksi rata-rata ${money(perTransaksi)}.`,
+    blocks: [
+      { kind: 'stat', label: 'Rata-rata per hari', value: money(perHari), sub: `dari ${money(total)} selama ${hari} hari`, tone: q.flow === 'income' ? 'in' : 'out' },
+      { kind: 'stat', label: 'Rata-rata per transaksi', value: money(perTransaksi), sub: `${scoped.length} transaksi` },
+      {
+        kind: 'note',
+        tone: 'ok',
+        title: 'Kalau diteruskan sebulan',
+        text: `Dengan pola ini, sebulan kira-kira ${money(perHari * 30)}.`,
+      },
+    ],
+    suggestions: ['Yang paling boros apa?', 'Ada saran biar lebih hemat?'],
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Kapan terakhir                                                      */
+/* ------------------------------------------------------------------ */
+
+function answerWhen(q: ParsedQuestion, ctx: Ctx): Answer {
+  const { data, money } = ctx;
+  // Pertanyaan "kapan" biasanya tidak dibatasi periode, jadi lihat semuanya.
+  const scoped = data.transactions
+    .filter((t) => (q.categoryId ? t.categoryId === q.categoryId : t.type === q.flow))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const apa = q.categoryName ?? (q.flow === 'income' ? 'pemasukan' : 'pengeluaran');
+
+  if (scoped.length === 0) {
+    return {
+      text: `Belum pernah ada catatan ${apa} sama sekali.`,
+      blocks: [],
+      suggestions: ['Yang paling boros apa?', 'Berapa saldo saya?'],
+    };
+  }
+
+  const terakhir = scoped[0];
+  const jarak = Math.max(0, daysBetween(terakhir.date, todayISO()));
+  const cat = data.categories.find((c) => c.id === terakhir.categoryId);
+
+  return {
+    text: pick(
+      `Terakhir ${formatDate(terakhir.date)}, ${jarak === 0 ? 'hari ini' : `${humanizeDuration(jarak)} yang lalu`} — ${money(terakhir.amount)}.`,
+      `${kapital(apa)} terakhir ${jarak === 0 ? 'hari ini' : `${humanizeDuration(jarak)} lalu`}, tanggal ${formatDate(terakhir.date)}, ${money(terakhir.amount)}.`,
+    ),
+    blocks: [
+      {
+        kind: 'stat',
+        label: `${cat?.icon ?? ''} ${terakhir.note?.trim() || cat?.name || apa}`,
+        value: money(terakhir.amount),
+        sub: `${formatDate(terakhir.date)} · ${jarak === 0 ? 'hari ini' : `${humanizeDuration(jarak)} lalu`}`,
+        tone: q.flow === 'income' ? 'in' : 'out',
+      },
+      {
+        kind: 'list',
+        items: scoped.slice(1, 5).map((t) => {
+          const c = data.categories.find((x) => x.id === t.categoryId);
+          return { icon: c?.icon, title: t.note?.trim() || c?.name || 'Transaksi', sub: formatDate(t.date), right: money(t.amount) };
+        }),
+      },
+    ],
+    suggestions: [q.categoryName ? `Berapa pengeluaran ${q.categoryName} bulan ini?` : 'Yang paling boros apa?', 'Ringkas keuangan saya'],
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Saldo satu dompet                                                   */
+/* ------------------------------------------------------------------ */
+
+function answerWallet(q: ParsedQuestion, ctx: Ctx): Answer {
+  const { data, money } = ctx;
+  const wallet = data.wallets.find((w) => w.id === q.walletId);
+  if (!wallet) return answerBalance(ctx);
+
+  const saldo = walletBalance(wallet, data.transactions);
+  const bulanIni = txIn(data, q.period.range).filter((t) => t.walletId === wallet.id);
+  const masuk = totalByType(bulanIni, 'income');
+  const keluar = totalByType(bulanIni, 'expense');
+
+  return {
+    text: pick(
+      `${wallet.name} isinya ${money(saldo)} sekarang.`,
+      `Saldo ${wallet.name} kamu ${money(saldo)}.`,
+    ),
+    blocks: [
+      { kind: 'stat', label: `${wallet.icon} ${wallet.name}`, value: money(saldo), sub: wallet.accountNumber },
+      {
+        kind: 'list',
+        items: [
+          { icon: '📥', title: `Masuk ${q.period.label}`, right: money(masuk), tone: 'in' },
+          { icon: '📤', title: `Keluar ${q.period.label}`, right: money(keluar), tone: 'out' },
+          { icon: '🧾', title: 'Transaksi', right: `${bulanIni.length}` },
+        ],
+      },
+    ],
+    suggestions: ['Berapa total saldo saya?', 'Yang paling boros apa?'],
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /* Sapaan, bantuan, dan cadangan                                       */
 /* ------------------------------------------------------------------ */
@@ -835,6 +1077,16 @@ export function buildAnswer(q: ParsedQuestion, data: AppData): Answer {
       return answerCompare(q, ctx);
     case 'ranking':
       return answerRanking(q, ctx);
+    case 'largest':
+      return answerLargest(q, ctx);
+    case 'count':
+      return answerCount(q, ctx);
+    case 'average':
+      return answerAverage(q, ctx);
+    case 'when':
+      return answerWhen(q, ctx);
+    case 'wallet':
+      return answerWallet(q, ctx);
     case 'debt':
       return answerDebt(q, ctx);
     case 'budget':

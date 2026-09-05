@@ -16,6 +16,15 @@ export type Intent =
   | 'advice'
   | 'compare'
   | 'ranking'
+  /** Satu transaksi terbesar, bukan peringkat kategori. */
+  | 'largest'
+  /** Berapa kali, bukan berapa rupiah. */
+  | 'count'
+  | 'average'
+  /** Kapan terakhir kali sesuatu terjadi. */
+  | 'when'
+  /** Saldo satu dompet tertentu. */
+  | 'wallet'
   | 'debt'
   | 'budget'
   | 'balance'
@@ -35,6 +44,9 @@ export interface ParsedQuestion {
   flow: 'expense' | 'income';
   /** True bila pengguna secara eksplisit menyebut jenis arus kasnya. */
   flowExplicit: boolean;
+  /** Dompet yang cocok dengan pertanyaan, bila ada. */
+  walletId?: string;
+  walletName?: string;
   /** Nama orang pada pertanyaan seputar hutang. */
   personName?: string;
   /**
