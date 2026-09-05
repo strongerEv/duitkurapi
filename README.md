@@ -86,6 +86,29 @@ Contoh hasil jadinya:
 > **Catatan privasi:** Duitku hanya *membuka* WhatsApp dengan pesan yang sudah jadi.
 > Kamu tetap yang menekan tombol kirim, jadi tidak ada pesan terkirim tanpa sepengetahuanmu.
 
+### 🤖 Asisten Keuangan (chat mengambang)
+
+Tombol mengambang di setiap halaman membuka asisten yang membaca seluruh catatanmu dan
+menjawab langsung — tidak perlu scroll dan menghitung sendiri.
+
+| Kamu tanya | Yang kamu dapat |
+|---|---|
+| "Berapa pengeluaran bensin bulan ini?" | Nominal, jumlah transaksi, rata-rata harian, perbandingan otomatis dengan bulan lalu, dan daftar transaksi terbesarnya |
+| "Kategori apa yang paling boros?" | Peringkat kategori berbentuk bar beserta persentasenya |
+| "Bandingkan dengan bulan lalu" | Kartu sebelum-sesudah, plus kategori mana yang paling berubah |
+| "Ada saran biar lebih hemat?" | Analisis arus kas, kategori dominan, lonjakan tak wajar, transaksi receh yang menumpuk, anggaran jebol, dan piutang yang mengendap |
+| "Berapa total piutang saya?" | Ringkasan hutang-piutang, urutan yang paling lama, dan penanda lewat jatuh tempo |
+| "Bagaimana anggaran saya?" | Status tiap anggaran dengan peringatan sebelum jebol |
+
+Memahami penyebutan waktu sehari-hari: *hari ini, kemarin, minggu ini, bulan lalu, tahun ini,
+Agustus, 3 bulan terakhir*. Juga memahami kata sehari-hari yang bukan nama kategori — "bensin",
+"ngopi", "pulsa", "netflix" — dan mengenali kategori buatanmu sendiri.
+
+> **Semua analisis berjalan di perangkat.** Tidak ada API, tidak ada kunci, tidak ada biaya, dan
+> tidak sepotong pun data keuanganmu dikirim ke internet — jadi tetap berfungsi saat offline dan
+> janji privasi aplikasi tetap utuh. Angkanya dihitung langsung dari catatanmu, sehingga tidak
+> mungkin salah hitung atau mengarang data.
+
 ### 📊 Sinkronisasi ke Google Sheets
 Duitku bisa mengirim seluruh datanya ke spreadsheet milikmu sendiri, otomatis, tanpa server perantara.
 
@@ -243,6 +266,10 @@ src/
 │   ├── sheets.ts               ★ Penyusun & pengirim data ke Google Sheets
 │   ├── guidePdf.ts             Panduan integrasi spreadsheet dalam bentuk PDF
 │   ├── platform.ts             ★ Pembeda perilaku web vs aplikasi Android
+│   ├── assistant/              ★ Asisten keuangan: penafsir pertanyaan & perakit jawaban
+│   │   ├── parse.ts                Menafsirkan periode, kategori, dan maksud pertanyaan
+│   │   ├── answer.ts               Menghitung jawaban langsung dari catatan pengguna
+│   │   └── types.ts                Bentuk jawaban: stat, bar, delta, daftar, catatan
 │   ├── calc.ts                 Perhitungan saldo, hutang, anggaran, statistik
 │   ├── date.ts                 Format tanggal Indonesia & "lama hutang" versi manusia
 │   ├── format.ts               Format mata uang & input nominal
@@ -256,6 +283,7 @@ src/
 ├── components/
 │   ├── WhatsAppReminder.tsx    ★ Penyusun pesan penagihan + pratinjau gaya WA
 │   ├── ExportReportSheet.tsx   ★ Pemilih periode & isi laporan sebelum diunduh PDF
+│   ├── AiChat.tsx              ★ Tombol mengambang & panel percakapan asisten
 │   ├── Charts.tsx              Donut, bar, progress bar, progress ring (SVG murni)
 │   ├── Common.tsx              Ikon kategori, avatar, baris transaksi, input nominal
 │   ├── Sheet.tsx               Bottom sheet & dialog konfirmasi

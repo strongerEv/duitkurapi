@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import BottomNav from './components/BottomNav';
+import AiChat from './components/AiChat';
 import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
 import TransactionForm from './pages/TransactionForm';
@@ -47,6 +48,9 @@ export default function App() {
         <Route path="/pengaturan/spreadsheet" element={<SheetSync />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      {/* Asisten selalu tersedia, kecuali saat mengisi formulir agar tidak
+          menutupi tombol simpan. */}
+      {!fullScreen && <AiChat />}
       {!fullScreen && <BottomNav />}
     </div>
   );

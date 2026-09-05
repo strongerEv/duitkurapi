@@ -655,3 +655,220 @@ a { color: inherit; text-decoration: none; }
 .f1 { flex: 1; min-width: 0; }
 .fs-12 { font-size: 12px; } .fs-13 { font-size: 13px; } .fs-14 { font-size: 14px; }
 .fw-700 { font-weight: 700; }
+
+/* ==========================================================================
+   Asisten keuangan — tombol mengambang & panel percakapan
+   ========================================================================== */
+
+.ai-fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--nav-h) + var(--safe-b) + 14px);
+  width: 54px; height: 54px;
+  border-radius: var(--r-full);
+  border: none; cursor: pointer;
+  background: linear-gradient(135deg, var(--mint), var(--green-600));
+  color: #fff;
+  display: grid; place-items: center;
+  box-shadow: var(--shadow-green);
+  z-index: 45;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.18s ease;
+}
+.ai-fab:active { transform: scale(0.9); }
+.ai-fab.hidden { opacity: 0; pointer-events: none; transform: scale(0.6); }
+.ai-fab .spark {
+  position: absolute; top: -2px; right: -2px;
+  width: 13px; height: 13px; border-radius: var(--r-full);
+  background: var(--amber); border: 2.5px solid var(--surface);
+}
+
+/* Panel percakapan */
+
+.ai-panel {
+  position: fixed; inset: 0; z-index: 120;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(6, 30, 21, 0.45);
+  backdrop-filter: blur(2px);
+  animation: fade-in 0.2s ease;
+}
+.ai-sheet {
+  width: 100%; max-width: var(--max-w);
+  height: 92vh;
+  background: var(--bg);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  animation: slide-up 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.ai-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.ai-avatar {
+  width: 40px; height: 40px; border-radius: 14px;
+  background: linear-gradient(135deg, var(--mint), var(--green-700));
+  color: #fff; display: grid; place-items: center; flex: none;
+}
+.ai-title { font-size: 15px; font-weight: 750; letter-spacing: -0.01em; }
+.ai-status { font-size: 11.5px; color: var(--text-muted); display: flex; align-items: center; gap: 5px; }
+.ai-status .dot-live {
+  width: 6px; height: 6px; border-radius: var(--r-full);
+  background: var(--income); flex: none;
+}
+
+/* Aliran pesan */
+
+.ai-body {
+  flex: 1; overflow-y: auto;
+  padding: 18px 16px 8px;
+  display: flex; flex-direction: column; gap: 14px;
+  scroll-behavior: smooth;
+}
+
+.ai-msg { display: flex; animation: msg-in 0.26s cubic-bezier(0.32, 0.72, 0, 1); }
+@keyframes msg-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+.ai-msg.user { justify-content: flex-end; }
+.ai-msg.user .bubble {
+  background: var(--green-500); color: #fff;
+  border-radius: var(--r-lg) var(--r-lg) 6px var(--r-lg);
+  padding: 11px 15px; max-width: 82%;
+  font-size: 14.5px; line-height: 1.55;
+  box-shadow: 0 4px 12px rgba(18, 153, 107, 0.22);
+}
+.ai-msg.bot { flex-direction: column; gap: 10px; align-items: flex-start; }
+.ai-msg.bot .bubble {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg) var(--r-lg) var(--r-lg) 6px;
+  padding: 13px 15px; max-width: 92%;
+  font-size: 14.5px; line-height: 1.62;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Kartu data di dalam jawaban */
+
+.ai-blocks { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+
+.ai-stat {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: 13px 15px;
+  box-shadow: var(--shadow-sm);
+}
+.ai-stat .lbl { font-size: 11.5px; color: var(--text-muted); font-weight: 650; }
+.ai-stat .val { font-size: 21px; font-weight: 800; letter-spacing: -0.02em; margin-top: 2px; }
+.ai-stat .val.in { color: var(--income); }
+.ai-stat .val.out { color: var(--expense); }
+.ai-stat .sub { font-size: 11.5px; color: var(--text-faint); margin-top: 3px; }
+
+.ai-bars {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: 14px 15px;
+  display: flex; flex-direction: column; gap: 11px;
+  box-shadow: var(--shadow-sm);
+}
+.ai-bar .row { display: flex; align-items: center; gap: 7px; font-size: 13px; margin-bottom: 5px; }
+.ai-bar .nm { flex: 1; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-bar .amt { font-weight: 700; font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
+.ai-bar .track { height: 7px; border-radius: var(--r-full); background: var(--surface-3); overflow: hidden; }
+.ai-bar .fill { height: 100%; border-radius: var(--r-full); transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+
+.ai-delta {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: 14px 15px;
+  box-shadow: var(--shadow-sm);
+}
+.ai-delta .lbl { font-size: 11.5px; color: var(--text-muted); font-weight: 650; margin-bottom: 10px; }
+.ai-delta .pair { display: flex; align-items: center; gap: 10px; }
+.ai-delta .side { flex: 1; min-width: 0; }
+.ai-delta .side .t { font-size: 11px; color: var(--text-faint); }
+.ai-delta .side .v { font-size: 15px; font-weight: 750; letter-spacing: -0.01em; }
+.ai-delta .arrow { color: var(--text-faint); flex: none; }
+.ai-delta .verdict {
+  margin-top: 10px; font-size: 12px; font-weight: 700;
+  padding: 5px 10px; border-radius: var(--r-full); display: inline-block;
+}
+.ai-delta .verdict.good { background: var(--income-bg); color: var(--income); }
+.ai-delta .verdict.bad { background: var(--expense-bg); color: var(--expense); }
+.ai-delta .verdict.flat { background: var(--surface-3); color: var(--text-muted); }
+
+.ai-list {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: 6px 4px;
+  box-shadow: var(--shadow-sm);
+}
+.ai-list .item { display: flex; align-items: center; gap: 11px; padding: 9px 11px; }
+.ai-list .item + .item { border-top: 1px solid var(--border); }
+.ai-list .ic {
+  width: 30px; height: 30px; border-radius: 10px; flex: none;
+  background: var(--surface-3); display: grid; place-items: center; font-size: 14px;
+}
+.ai-list .txt { flex: 1; min-width: 0; }
+.ai-list .txt .t { font-size: 13.5px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-list .txt .s { font-size: 11.5px; color: var(--text-muted); }
+.ai-list .rt { font-size: 13.5px; font-weight: 750; white-space: nowrap; }
+.ai-list .rt.in { color: var(--income); }
+.ai-list .rt.out { color: var(--expense); }
+.ai-list .rt.warn { color: var(--warn); }
+
+.ai-note { border-radius: var(--r-md); padding: 13px 15px; border-left: 3px solid; }
+.ai-note.ok { background: var(--income-bg); border-left-color: var(--income); }
+.ai-note.warn { background: var(--warn-bg); border-left-color: var(--warn); }
+.ai-note.danger { background: var(--expense-bg); border-left-color: var(--expense); }
+.ai-note .t { font-size: 13px; font-weight: 750; margin-bottom: 3px; }
+.ai-note.ok .t { color: var(--income); }
+.ai-note.warn .t { color: #B45309; }
+.ai-note.danger .t { color: var(--expense); }
+:root[data-theme='dark'] .ai-note.warn .t { color: var(--amber); }
+.ai-note .s { font-size: 12.5px; color: var(--text-muted); line-height: 1.55; }
+
+/* Titik "sedang berpikir" */
+
+.ai-typing { display: flex; gap: 4px; padding: 15px 17px; }
+.ai-typing span {
+  width: 7px; height: 7px; border-radius: var(--r-full);
+  background: var(--text-faint); animation: blink 1.3s infinite;
+}
+.ai-typing span:nth-child(2) { animation-delay: 0.18s; }
+.ai-typing span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes blink { 0%, 60%, 100% { opacity: 0.25; } 30% { opacity: 1; } }
+
+/* Saran pertanyaan & kolom ketik */
+
+.ai-suggest { display: flex; gap: 7px; overflow-x: auto; padding: 2px 16px 10px; flex: none; scrollbar-width: none; }
+.ai-suggest::-webkit-scrollbar { display: none; }
+.ai-suggest button {
+  flex: none; white-space: nowrap; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  color: var(--green-600); border-radius: var(--r-full);
+  padding: 8px 14px; font-size: 12.5px; font-weight: 650;
+  transition: all 0.15s ease;
+}
+.ai-suggest button:active { background: var(--green-50); transform: scale(0.97); }
+
+.ai-input-row {
+  display: flex; gap: 9px; align-items: flex-end;
+  padding: 12px 16px calc(14px + var(--safe-b));
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  flex: none;
+}
+.ai-input-row textarea {
+  flex: 1; resize: none; max-height: 110px;
+  padding: 11px 14px; border-radius: var(--r-lg);
+  border: 1px solid var(--border-strong); background: var(--surface-2);
+  color: var(--text); font-family: inherit; font-size: 15px; line-height: 1.45;
+  outline: none; transition: border-color 0.15s ease;
+}
+.ai-input-row textarea:focus { border-color: var(--green-400); }
+.ai-send {
+  width: 44px; height: 44px; border-radius: var(--r-full); flex: none;
+  border: none; cursor: pointer; background: var(--green-500); color: #fff;
+  display: grid; place-items: center;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.ai-send:active { transform: scale(0.92); }
+.ai-send:disabled { opacity: 0.4; cursor: not-allowed; }
