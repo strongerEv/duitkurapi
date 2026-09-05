@@ -1052,11 +1052,55 @@ function answerHelp(name: string): Answer {
   };
 }
 
+function answerIdentity(data: AppData): Answer {
+  const n = data.transactions.length;
+  return {
+    text:
+      'Aku Asisten Duitku ✨ Tugasku baca semua catatan keuanganmu, terus jawab pertanyaanmu ' +
+      `soal itu. Sekarang ada ${n} transaksi yang bisa aku lihat.`,
+    blocks: [
+      {
+        kind: 'note',
+        tone: 'ok',
+        title: 'Aku kerja di HP kamu, bukan di internet',
+        text: 'Semua hitungan aku kerjakan langsung di perangkat ini. Nggak ada data yang dikirim ke mana-mana, dan tetap jalan walau lagi offline.',
+      },
+    ],
+    suggestions: CONTOH.slice(0, 3),
+  };
+}
+
+function answerThanks(): Answer {
+  return {
+    text: pick(
+      'Sama-sama! 😄 Ada lagi yang mau ditanya?',
+      'Siap, senang bisa bantu 👍',
+      'Sama-sama. Tanya aja kalau ada yang mau dicek lagi.',
+    ),
+    blocks: [],
+    suggestions: CONTOH.slice(0, 3),
+  };
+}
+
+/**
+ * Jawaban terakhir bila maksud pertanyaan tidak terbaca.
+ *
+ * Prinsipnya: jangan pernah menjawab dengan tangan hampa. Kalau pertanyaannya
+ * menyebut kategori atau dompet, itu sudah cukup untuk memberi angka. Kalau
+ * benar-benar tidak ada petunjuk, tampilkan ringkasan periode yang disebut.
+ */
 function answerUnknown(q: ParsedQuestion, ctx: Ctx): Answer {
+  if (q.categoryId) {
+    const a = answerMetric(q, ctx);
+    return { ...a, text: `Aku tebak kamu nanya soal ${q.categoryName}. ${a.text}` };
+  }
+  if (q.walletId) return answerWallet(q, ctx);
+  if (q.personName) return answerDebt(q, ctx);
+
   const fallback = answerOverview(q, ctx);
   return {
     ...fallback,
-    text: `Hmm, aku kurang nangkep maksudnya 😅 Tapi ini ringkasan ${q.period.label}, siapa tahu yang kamu cari. ${fallback.text}`,
+    text: `Hmm, aku kurang nangkep maksudnya 😅 Tapi ini ringkasan ${q.period.label}, siapa tahu ini yang kamu cari. ${fallback.text}`,
     suggestions: CONTOH.slice(0, 4),
   };
 }
@@ -1071,6 +1115,10 @@ export function buildAnswer(q: ParsedQuestion, data: AppData): Answer {
     case 'greeting':
     case 'help':
       return answerHelp(data.settings.userName || 'Sobat');
+    case 'identity':
+      return answerIdentity(data);
+    case 'thanks':
+      return answerThanks();
     case 'advice':
       return answerAdvice(q, ctx);
     case 'compare':

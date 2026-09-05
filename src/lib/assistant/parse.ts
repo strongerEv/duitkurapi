@@ -82,14 +82,16 @@ function bakukan(kata: string): string {
   if (KAMUS.includes(rapat)) return rapat;
   if (KAMUS.includes(kata)) return kata;
 
-  // Koreksi ejaan hanya untuk kata yang cukup panjang, agar kata pendek
-  // seperti "ada" tidak berubah jadi "apa".
+  /*
+   * Koreksi ejaan dibatasi satu huruf saja. Toleransi dua huruf terbukti
+   * berbahaya: kata sah seperti "langganan" ikut diubah menjadi "anggaran",
+   * sehingga pertanyaan soal langganan dikira pertanyaan soal anggaran.
+   */
   if (kata.length >= 5) {
-    const batas = kata.length >= 8 ? 2 : 1;
     let terbaik: { kata: string; jarak: number } | undefined;
     for (const benar of KAMUS) {
       const jarak = editDistance(kata, benar);
-      if (jarak <= batas && (!terbaik || jarak < terbaik.jarak)) terbaik = { kata: benar, jarak };
+      if (jarak <= 1 && (!terbaik || jarak < terbaik.jarak)) terbaik = { kata: benar, jarak };
     }
     if (terbaik) return terbaik.kata;
   }
@@ -325,6 +327,13 @@ const HINTS: Record<string, string[]> = {
   'cat-investasi': ['investasi', 'saham', 'reksadana', 'dividen', 'emas'],
 };
 
+/**
+ * Nama kategori yang juga merupakan kata umum sehari-hari. "Belanja di warung"
+ * lebih tepat masuk Makan & Minum daripada kategori bernama Belanja, jadi nama
+ * seperti ini hanya dipakai bila tidak ada petunjuk yang lebih spesifik.
+ */
+const NAMA_UMUM = ['belanja', 'lainnya', 'tagihan', 'usaha'];
+
 /** Mencari kategori yang paling cocok dengan pertanyaan. */
 export function matchCategory(text: string, categories: Category[]): Category | undefined {
   // Nama kategori yang benar-benar dimiliki pengguna diutamakan, termasuk
@@ -336,17 +345,26 @@ export function matchCategory(text: string, categories: Category[]): Category | 
       return words.length > 0 && words.every((w) => hasWord(text, w));
     })
     .sort((a, b) => b.name.length - a.name.length);
-  if (byName[0]) return byName[0];
 
-  let best: { cat: Category; len: number } | undefined;
+  const umum = byName[0] && NAMA_UMUM.includes(normalize(byName[0].name));
+  if (byName[0] && !umum) return byName[0];
+
+  // Kata petunjuk dikumpulkan dulu, lalu yang khusus diutamakan. "Belanja di
+  // warung" menyebut dua petunjuk sekaligus, dan "warung" lebih menjelaskan.
+  const cocok: { cat: Category; len: number; umum: boolean }[] = [];
   for (const [id, words] of Object.entries(HINTS)) {
     const cat = categories.find((c) => c.id === id);
     if (!cat) continue;
     for (const w of words) {
-      if (hasWord(text, w) && (!best || w.length > best.len)) best = { cat, len: w.length };
+      if (hasWord(text, w)) cocok.push({ cat, len: w.length, umum: NAMA_UMUM.includes(w) });
     }
   }
-  return best?.cat;
+
+  const khusus = cocok.filter((c) => !c.umum).sort((a, b) => b.len - a.len);
+  if (khusus[0]) return khusus[0].cat;
+
+  const sisa = cocok.sort((a, b) => b.len - a.len);
+  return sisa[0]?.cat ?? byName[0];
 }
 
 /* ------------------------------------------------------------------ */
@@ -406,6 +424,16 @@ function detectIntent(
   }
   if (has(text, 'bisa apa', 'apa saja', 'bantuan', 'help', 'cara pakai', 'kamu bisa')) return 'help';
 
+  if (has(text, 'makasih', 'makasi', 'terima kasih', 'thanks', 'thank you', 'trims', 'tengkyu', 'suwun')) {
+    return 'thanks';
+  }
+  if (
+    has(text, 'kamu siapa', 'siapa kamu', 'nama kamu', 'kamu ai', 'kamu bot', 'kamu robot', 'kamu apa') ||
+    /\bsiapa\s+(kamu|km|anda)\b/.test(text)
+  ) {
+    return 'identity';
+  }
+
   // Pertanyaan waktu: "kapan terakhir aku isi bensin"
   if (has(text, 'kapan', 'tanggal berapa')) return 'when';
 
@@ -420,24 +448,42 @@ function detectIntent(
 
   if (has(text, 'rata rata', 'rata-rata', 'rerata', 'per hari', 'sehari')) return 'average';
 
+  // Permintaan saran yang tidak bisa disalahartikan diperiksa paling awal,
+  // supaya "ada saran biar lebih hemat" tidak tertangkap kata "lebih hemat"
+  // milik pertanyaan perbandingan.
+  if (has(text, 'saran', 'sarannya', 'tips', 'rekomendasi', 'nasihat', 'nasehat', 'masukan')) {
+    return 'advice';
+  }
+
+  // Perbandingan didahulukan: "lebih hemat mana" mengandung kata "hemat"
+  // yang juga milik pertanyaan saran.
+  if (
+    has(
+      text, 'banding', 'bandingkan', 'dibanding', 'dibandingkan', 'perbandingan', 'vs', 'versus',
+      'selisih', 'naik atau turun', 'lebih besar', 'lebih boros', 'lebih hemat', 'lebih murah',
+    )
+  ) {
+    return 'compare';
+  }
+
+  // Permintaan rangkuman didahulukan, sebab "ringkasan keuangan saya" memuat
+  // kata "keuangan saya" yang juga milik pertanyaan saran.
+  const mintaRangkuman = has(
+    text, 'ringkas', 'ringkasan', 'ringkaskan', 'rangkum', 'rangkuman', 'laporan',
+    'overview', 'gambaran', 'rekap',
+  );
+  if (mintaRangkuman) return 'overview';
+
   if (
     has(
       text, 'saran', 'sarannya', 'tips', 'nasihat', 'nasehat', 'rekomendasi', 'gimana caranya',
       'bagaimana caranya', 'harus gimana', 'hemat', 'menghemat', 'berhemat', 'evaluasi',
-      'analisis', 'analisa', 'sehat', 'kondisi keuangan', 'keuangan saya', 'gimana keuangan',
-      'bagaimana keuangan', 'keuanganku', 'boros tidak', 'boros nggak', 'menurut kamu',
+      'analisis', 'analisa', 'sehat', 'kondisi', 'kondisi keuangan', 'keuangan saya',
+      'gimana keuangan', 'bagaimana keuangan', 'keuanganku', 'boros tidak', 'boros nggak',
+      'menurut kamu', 'perbaiki', 'diperbaiki', 'masukan', 'pendapat kamu', 'bisa nabung',
     )
   ) {
     return 'advice';
-  }
-
-  if (
-    has(
-      text, 'banding', 'bandingkan', 'dibanding', 'dibandingkan', 'perbandingan', 'vs', 'versus',
-      'selisih', 'naik atau turun', 'lebih besar', 'lebih boros', 'lebih hemat',
-    )
-  ) {
-    return 'compare';
   }
 
   // Satu transaksi terbesar berbeda dengan peringkat kategori. Penyebutan
@@ -465,8 +511,9 @@ function detectIntent(
   if (
     has(
       text, 'hutang', 'hutangnya', 'berhutang', 'utang', 'piutang', 'piutangnya', 'pinjam',
-      'pinjaman', 'meminjam', 'nagih', 'menagih', 'ditagih', 'penagihan', 'belum bayar',
-      'sudah bayar', 'jatuh tempo', 'tunggakan',
+      'pinjaman', 'meminjam', 'nagih', 'menagih', 'ditagih', 'tagih', 'penagihan',
+      'belum bayar', 'sudah bayar', 'telat bayar', 'telat', 'nunggak', 'menunggak',
+      'tunggakan', 'jatuh tempo', 'dipegang', 'dipegang orang', 'belum kembali', 'belum balik',
     )
   ) {
     return 'debt';
@@ -485,10 +532,6 @@ function detectIntent(
   );
   if (has(text, 'saldo', 'sisa uang', 'uang saya', 'punya uang', 'dompet', 'total uang') && !nadaArusKas) {
     return 'balance';
-  }
-
-  if (has(text, 'ringkas', 'ringkasan', 'ringkaskan', 'rangkum', 'rangkuman', 'laporan', 'overview', 'kondisi', 'gambaran')) {
-    return 'overview';
   }
 
   if (

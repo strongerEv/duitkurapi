@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit false --emitDeclarationOnly false",
     "android": "npm run build && npx cap sync android && npx cap open android",
-    "android:sync": "npm run build && npx cap sync android"
+    "android:sync": "npm run build && npx cap sync android",
+    "eval:asisten": "esbuild scripts/eval-asisten.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/eval-asisten.mjs --log-level=error && node node_modules/.cache/eval-asisten.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",

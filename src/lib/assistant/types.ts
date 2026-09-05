@@ -13,6 +13,10 @@ export interface ParsedPeriod {
 export type Intent =
   | 'greeting'
   | 'help'
+  /** "Kamu siapa?" — memperkenalkan diri. */
+  | 'identity'
+  /** Ucapan terima kasih. */
+  | 'thanks'
   | 'advice'
   | 'compare'
   | 'ranking'
